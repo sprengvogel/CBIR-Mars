@@ -46,7 +46,7 @@ def validate(model, dataloader, epoch):
             running_loss += loss.item()
             # calculate batch psnr (once every `batch_size` iterations)
         outputs = outputs.cpu()
-        save_image(outputs, f"Outputs/val_sr{epoch}.png")
+        save_image(outputs, f"outputs/val_sr{epoch}.png")
     final_loss = running_loss / len(ctx_val)
 
     return final_loss
@@ -116,7 +116,7 @@ if __name__ == '__main__':
             best_epoch = epoch
             best_loss = val_epoch_loss
             print("Saved Model. Best Epoch: " + str(best_epoch))
-            torch.save(model.state_dict(), 'Outputs/model_best.pth')
+            torch.save(model.state_dict(), 'outputs/model_best.pth')
         print(f"Train Loss: {train_epoch_loss}")
         print(f"Val Loss: {val_epoch_loss}")
         train_loss.append(train_epoch_loss)
