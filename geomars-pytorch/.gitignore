@@ -1,0 +1,7 @@
+/data
+/models
+/results
+/lightning_logs
+/src/__pycache__
+/.idea
+/Outputs
