@@ -4,7 +4,6 @@ import torch.optim as optim
 import torch.nn as nn
 from torch.utils.data import DataLoader, Dataset
 from tqdm import tqdm
-from torchvision.utils import save_image
 from torchvision import transforms, datasets
 
 
@@ -44,9 +43,6 @@ def validate(model, dataloader, epoch):
             loss = criterion(outputs, label)
             # add loss of each item (total items in a batch = batch size)
             running_loss += loss.item()
-            # calculate batch psnr (once every `batch_size` iterations)
-        outputs = outputs.cpu()
-        save_image(outputs, f"outputs/val_sr{epoch}.png")
     final_loss = running_loss / len(ctx_val)
 
     return final_loss
