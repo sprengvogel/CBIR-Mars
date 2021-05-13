@@ -24,12 +24,6 @@ def download_file(url, path):
     return local_filename
 
 
-def onehot(i, num_classes):
-    v = [0] * int(num_classes)
-    v[i] = 1
-    return v
-
-
 def read_geotiff(path):
     # Directly read the tiff data skimage and gdal. Somehow dtype=uint8.
     # Import as_gray=False to avoid float64 conversion.

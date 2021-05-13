@@ -12,9 +12,13 @@ from torch.nn import functional as F
 from sklearn.metrics import confusion_matrix
 
 from models import MarsModel
-from utils import onehot
 
-network_name = "densenet161"
+def onehot(i, num_classes):
+    v = [0] * int(num_classes)
+    v[i] = 1
+    return v
+
+network_name = "densenet121"
 
 data_transform = transforms.Compose(
     [
@@ -36,73 +40,75 @@ hyper_params = {
     "transfer_learning": False,
 }
 
-device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-model = MarsModel(hyper_params)
-checkpoint = torch.load("./models/" + network_name + ".pth")
-model.load_state_dict(checkpoint)
+if __name__ == '__main__':
 
-ctx_test = datasets.ImageFolder(root="./data/test", transform=data_transform)
-test_loader = torch.utils.data.DataLoader(
-    ctx_test, batch_size=16, shuffle=True, num_workers=4
-)
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    model = MarsModel(hyper_params)
+    checkpoint = torch.load("./models/" + network_name + ".pth")
+    model.load_state_dict(checkpoint)
 
-labels = []
-predictions = []
-scores = []
+    ctx_test = datasets.ImageFolder(root="./data/test", transform=data_transform)
+    test_loader = torch.utils.data.DataLoader(
+        ctx_test, batch_size=16, shuffle=True, num_workers=4
+    )
 
-# Put on GPU if available
-model = model.to(device)
+    labels = []
+    predictions = []
+    scores = []
 
-# Set model to eval mode (turns off dropout and moving averages of batchnorm)
-model.eval()
+    # Put on GPU if available
+    model = model.to(device)
 
-# Iterate over test set
-with torch.no_grad():
-    for i_batch, batch in enumerate(test_loader):
-        x, y = batch
-        y_hat = model(x.to(device))
-        pred = torch.argmax(y_hat, dim=1).cpu()
+    # Set model to eval mode (turns off dropout and moving averages of batchnorm)
+    model.eval()
 
-        labels.append(y.numpy())
-        predictions.append(pred.numpy())
-        scores.append(F.softmax(y_hat, dim=1).detach().cpu().numpy())
+    # Iterate over test set
+    with torch.no_grad():
+        for i_batch, batch in enumerate(test_loader):
+            x, y = batch
+            y_hat = model(x.to(device))
+            pred = torch.argmax(y_hat, dim=1).cpu()
 
-# Computing metrics
-labels = np.concatenate(labels, axis=0)
-predictions = np.concatenate(predictions, axis=0)
-scores = np.concatenate(scores, axis=0)
+            labels.append(y.numpy())
+            predictions.append(pred.numpy())
+            scores.append(F.softmax(y_hat, dim=1).detach().cpu().numpy())
 
-onehot_labels = [onehot(label, hyper_params["num_classes"]) for label in labels]
-onehot_predictions = [
-    onehot(prediction, hyper_params["num_classes"]) for prediction in predictions
-]
+    # Computing metrics
+    labels = np.concatenate(labels, axis=0)
+    predictions = np.concatenate(predictions, axis=0)
+    scores = np.concatenate(scores, axis=0)
 
-y = label_binarize(labels, classes=[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14])
-y_pred = label_binarize(
-    predictions, classes=[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]
-)
+    onehot_labels = [onehot(label, hyper_params["num_classes"]) for label in labels]
+    onehot_predictions = [
+        onehot(prediction, hyper_params["num_classes"]) for prediction in predictions
+    ]
 
-macro_roc_auc_ovo = roc_auc_score(y, scores, multi_class="ovo", average="macro")
+    y = label_binarize(labels, classes=[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14])
+    y_pred = label_binarize(
+        predictions, classes=[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]
+    )
 
-macro_roc_auc_ovr = roc_auc_score(y, scores, multi_class="ovr", average="macro")
+    macro_roc_auc_ovo = roc_auc_score(y, scores, multi_class="ovo", average="macro")
 
-acc = metrics.accuracy_score(y, y_pred)
+    macro_roc_auc_ovr = roc_auc_score(y, scores, multi_class="ovr", average="macro")
 
-# Writing results to file
-print(
-    "Classification report for classifier %s:\n%s\n"
-    % (network_name, metrics.classification_report(y, y_pred, digits=4)),
-    file=open("./results/" + network_name + ".txt", "w"),
-)
-print(
-    "AUROC:\t",
-    macro_roc_auc_ovo,
-    macro_roc_auc_ovr,
-    file=open("./results/" + network_name + ".txt", "a"),
-)
-print("Acc:\t", acc, file=open("./results/" + network_name + ".txt", "a"))
-print("\n", file=open("./results/" + network_name + ".txt", "a"))
-print(
-    confusion_matrix(labels, predictions),
-    file=open("./results/" + network_name + ".txt", "a"),
-)
+    acc = metrics.accuracy_score(y, y_pred)
+
+    # Writing results to file
+    print(
+        "Classification report for classifier %s:\n%s\n"
+        % (network_name, metrics.classification_report(y, y_pred, digits=4)),
+        file=open("./results/" + network_name + ".txt", "w"),
+    )
+    print(
+        "AUROC:\t",
+        macro_roc_auc_ovo,
+        macro_roc_auc_ovr,
+        file=open("./results/" + network_name + ".txt", "a"),
+    )
+    print("Acc:\t", acc, file=open("./results/" + network_name + ".txt", "a"))
+    print("\n", file=open("./results/" + network_name + ".txt", "a"))
+    print(
+        confusion_matrix(labels, predictions),
+        file=open("./results/" + network_name + ".txt", "a"),
+    )
