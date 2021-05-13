@@ -44,7 +44,10 @@ if __name__ == '__main__':
 
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     model = MarsModel(hyper_params)
-    checkpoint = torch.load("./models/" + network_name + ".pth")
+    if not torch.cuda.is_available():
+        checkpoint = torch.load("../models/" + network_name + ".pth", map_location=torch.device('cpu'))
+    else:
+        checkpoint = torch.load("../models/" + network_name + ".pth")
     model.load_state_dict(checkpoint)
 
     ctx_test = datasets.ImageFolder(root="./data/test", transform=data_transform)
