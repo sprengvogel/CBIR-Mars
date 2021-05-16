@@ -9,6 +9,7 @@ import os
 from PIL import Image
 import sys
 import numpy as np
+import json
 
 if __name__ == '__main__':
 
@@ -29,7 +30,7 @@ if __name__ == '__main__':
 
     #Load state dict
     state_dict_path = os.path.join(os.getcwd(), "densenet121_pytorch_adapted.pth")
-    
+
     """ state_dict = torch.load(state_dict_path)
     new_state_dict = {}
     for key in state_dict:
@@ -46,7 +47,7 @@ if __name__ == '__main__':
             ]
         )
 
-    
+
 
     tf_last_layer_chopped = nn.Sequential(*list(model.children())[:-1])
     model.eval()
@@ -62,3 +63,21 @@ if __name__ == '__main__':
         fVector = pool(output).squeeze().cpu().numpy()
         print(fVector)
         image.show()
+
+
+        db_file = open("feature_db.json", "r")
+        feature_dict = json.load(db_file)
+        query = fVector
+        best_match = ("", np.inf)
+        for key in feature_dict.keys():
+            #print(feature_dict[key])
+            #print(query)
+            dist = np.linalg.norm(query - np.array(feature_dict[key]))
+            if dist < best_match[1]:
+                best_match = (key, dist)
+                print(dist)
+    print(best_match)
+    bestImage = Image.open(best_match[0])
+    bestImage.show()
+
+    #print(feature_dict)

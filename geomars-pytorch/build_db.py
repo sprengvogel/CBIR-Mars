@@ -28,7 +28,7 @@ if __name__ == '__main__':
     model.to(device)
 
     #Load state dict
-    state_dict_path = os.path.join(os.getcwd(), "outputs", "model_best.pth")
+    state_dict_path = os.path.join(os.getcwd(), "densenet121_pytorch_adapted.pth")
     model.load_state_dict(torch.load(state_dict_path))
 
 
@@ -55,8 +55,6 @@ if __name__ == '__main__':
     pool = torch.nn.AvgPool2d(7)
     model.eval()
 
-    db_file = open("feature_db.json", "w")
-
     with torch.no_grad():
         for bi, data in tqdm(enumerate(db_loader), total=int(len(ctx_train))):# / db_loader.batch_size)):
             #if bi > 10:
@@ -65,10 +63,10 @@ if __name__ == '__main__':
             output = tf_last_layer_chopped(image_data)
 
             fVector = pool(output).cpu().numpy()
-            fVector.squeeze()
+            fVector = fVector.squeeze()
             sample_fname, _ = db_loader.dataset.samples[bi]
             feature_dict[sample_fname] = fVector.tolist()
 
-
+    db_file = open("feature_db.json", "w")
     db_file.write(json.dumps(feature_dict))
     db_file.close()
