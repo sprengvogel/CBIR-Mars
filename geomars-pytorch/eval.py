@@ -26,8 +26,15 @@ if __name__ == '__main__':
     model.to(device)
 
     #Load state dict
-    state_dict_path = os.path.join(os.getcwd(), "outputs", "model_best.pth")
+    state_dict_path = os.path.join(os.getcwd(), "densenet121_pytorch_adapted.pth")
+    
+    """ state_dict = torch.load(state_dict_path)
+    new_state_dict = {}
+    for key in state_dict:
+        new_state_dict[key.removeprefix("net.")] = state_dict[key] """
+
     model.load_state_dict(torch.load(state_dict_path))
+    #torch.save(model.state_dict(), "densenet121_pytorch_adapted.pth")
 
     data_transform = transforms.Compose(
             [
