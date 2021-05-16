@@ -44,7 +44,7 @@ if __name__ == '__main__':
     db_loader = torch.utils.data.DataLoader(
         ctx_train,
         batch_size=1,
-        shuffle=True,
+        shuffle=False,
         num_workers=4,
         pin_memory=True,
     )

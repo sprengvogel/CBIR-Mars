@@ -68,16 +68,20 @@ if __name__ == '__main__':
         db_file = open("feature_db.json", "r")
         feature_dict = json.load(db_file)
         query = fVector
-        best_match = ("", np.inf)
+        matches_list = []
         for key in feature_dict.keys():
             #print(feature_dict[key])
             #print(query)
             dist = np.linalg.norm(query - np.array(feature_dict[key]))
-            if dist < best_match[1]:
-                best_match = (key, dist)
-                print(dist)
-    print(best_match)
-    bestImage = Image.open(best_match[0])
-    bestImage.show()
+            #if dist < best_match[1]:
+            matches_list.append( (key, dist))
+            print(dist)
+
+    matches_list.sort(key= lambda x : x[1])
+    for match in matches_list[:35]:
+        image = Image.open(match[0])
+        image.show()
+
+
 
     #print(feature_dict)
