@@ -7,13 +7,15 @@ from tqdm import tqdm
 from torchvision import transforms, datasets
 import os
 from PIL import Image
+import json
+
 
 if __name__ == '__main__':
 
     #Change current working directory to source file location
     os.chdir(os.path.dirname(__file__))
 
-    batch_size = 16
+    #batch_size = 16
     num_classes = 15
     # define device
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
@@ -29,8 +31,6 @@ if __name__ == '__main__':
     state_dict_path = os.path.join(os.getcwd(), "outputs", "model_best.pth")
     model.load_state_dict(torch.load(state_dict_path))
 
-    rootPath = os.path.join(os.getcwd(),"data","test","aec")
-    imageNames = os.listdir(rootPath)
 
     data_transform = transforms.Compose(
             [
@@ -41,34 +41,34 @@ if __name__ == '__main__':
         )
 
     ctx_train = datasets.ImageFolder(root="./data/train", transform=data_transform)
-    train_loader = torch.utils.data.DataLoader(
+    db_loader = torch.utils.data.DataLoader(
         ctx_train,
-        batch_size=batch_size,
+        batch_size=1,
         shuffle=True,
         num_workers=4,
         pin_memory=True,
     )
 
-    ctx_val = datasets.ImageFolder(root="./data/val", transform=data_transform)
-    val_loader = torch.utils.data.DataLoader(
-        ctx_val, batch_size=batch_size, shuffle=True, num_workers=8
-    )
+    feature_dict = {}
 
     tf_last_layer_chopped = nn.Sequential(*list(model.children())[:-1])
+    pool = torch.nn.AvgPool2d(7)
     model.eval()
-    print(model)
+
+    db_file = open("feature_db.json", "w")
+
     with torch.no_grad():
-        for bi, data in tqdm(enumerate(train_loader), total=int(len(ctx_train) / train_loader.batch_size)):
+        for bi, data in tqdm(enumerate(db_loader), total=int(len(ctx_train))):# / db_loader.batch_size)):
+            #if bi > 10:
+            #    break
             image_data = (data[0].to(device))
-            outputs = tf_last_layer_chopped(image_data)
-            for output in outputs:
-                pool = torch.nn.AvgPool2d(7)
-                fVector = pool(output).numpy()
-                #print(pool(output).shape)
-        for bi, data in tqdm(enumerate(val_loader), total=int(len(ctx_val) / val_loader.batch_size)):
-            image_data = (data[0].to(device))
-            outputs = tf_last_layer_chopped(image_data)
-            for output in outputs:
-                pool = torch.nn.AvgPool2d(7)
-                fVector = pool(output).numpy()
-                #print(pool(output).shape)
+            output = tf_last_layer_chopped(image_data)
+
+            fVector = pool(output).cpu().numpy()
+            fVector.squeeze()
+            sample_fname, _ = db_loader.dataset.samples[bi]
+            feature_dict[sample_fname] = fVector.tolist()
+
+
+    db_file.write(json.dumps(feature_dict))
+    db_file.close()
