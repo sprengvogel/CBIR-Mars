@@ -11,6 +11,18 @@ import sys
 import numpy as np
 import json
 
+
+def image_grid(imgs, rows, cols):
+    assert len(imgs) == rows * cols
+
+    w, h = imgs[0].size
+    grid = Image.new('RGB', size=(cols * w, rows * h))
+    grid_w, grid_h = grid.size
+
+    for i, img in enumerate(imgs):
+        grid.paste(img, box=(i % cols * w, i // cols * h))
+    return grid
+
 if __name__ == '__main__':
 
     #Change current working directory to source file location
@@ -36,7 +48,10 @@ if __name__ == '__main__':
     for key in state_dict:
         new_state_dict[key.removeprefix("net.")] = state_dict[key] """
 
-    model.load_state_dict(torch.load(state_dict_path))
+    if torch.cuda.is_available():
+        model.load_state_dict(torch.load(state_dict_path))
+    else:
+        model.load_state_dict(torch.load(state_dict_path, map_location=torch.device('cpu')))
     #torch.save(model.state_dict(), "densenet121_pytorch_adapted.pth")
 
     data_transform = transforms.Compose(
@@ -78,10 +93,13 @@ if __name__ == '__main__':
             print(dist)
 
     matches_list.sort(key= lambda x : x[1])
-    for match in matches_list[:35]:
+    images = []
+    for match in matches_list[:25]:
         image = Image.open(match[0])
-        image.show()
-
+        #image.show()
+        images.append(image)
+    grid = image_grid(images, 5, 5)
+    grid.show()
 
 
     #print(feature_dict)

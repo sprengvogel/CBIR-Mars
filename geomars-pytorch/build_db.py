@@ -29,7 +29,10 @@ if __name__ == '__main__':
 
     #Load state dict
     state_dict_path = os.path.join(os.getcwd(), "densenet121_pytorch_adapted.pth")
-    model.load_state_dict(torch.load(state_dict_path))
+    if torch.cuda.is_available():
+        model.load_state_dict(torch.load(state_dict_path))
+    else:
+        model.load_state_dict(torch.load(state_dict_path, map_location=torch.device('cpu')))
 
 
     data_transform = transforms.Compose(
