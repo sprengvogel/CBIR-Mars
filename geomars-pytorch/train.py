@@ -6,6 +6,21 @@ from torch.utils.data import DataLoader, Dataset
 from tqdm import tqdm
 from torchvision import transforms, datasets
 
+class TripletDataset(datasets.ImageFolder):
+
+    #def __init__(self, root, transform):
+    #    super().__init__(root, transform)
+
+    def __getitem__(self, index):
+        print(list(vars(self))[:-1])
+        print(self.class_to_idx)
+        print(self.classes)
+        #print(self.samples)
+        positive_list = self.index[self.index!=item][self.labels[self.index!=item]==anchor_label]
+        negative_list = self.index[self.index!=item][self.labels[self.index!=item]!=anchor_label]
+        print(positive_list)
+        print(negative_list)
+        return super().__getitem__(index)
 
 # train the model
 def train(model, dataloader):
@@ -52,7 +67,7 @@ if __name__ == '__main__':
 
     batch_size = 16
     num_classes = 15
-    epochs = 2
+    epochs = 1
 
     data_transform = transforms.Compose(
         [
@@ -62,7 +77,7 @@ if __name__ == '__main__':
         ]
     )
 
-    ctx_train = datasets.ImageFolder(root="./data/train", transform=data_transform)
+    ctx_train = TripletDataset(root="./data/train", transform=data_transform)
     train_loader = torch.utils.data.DataLoader(
         ctx_train,
         batch_size=batch_size,
@@ -71,12 +86,12 @@ if __name__ == '__main__':
         pin_memory=True,
     )
 
-    ctx_val = datasets.ImageFolder(root="./data/val", transform=data_transform)
+    ctx_val = TripletDataset(root="./data/val", transform=data_transform)
     val_loader = torch.utils.data.DataLoader(
         ctx_val, batch_size=batch_size, shuffle=True, num_workers=8
     )
 
-    ctx_test = datasets.ImageFolder(root="./data/test", transform=data_transform)
+    ctx_test = TripletDataset(root="./data/test", transform=data_transform)
     test_loader = torch.utils.data.DataLoader(
         ctx_test, batch_size=batch_size, shuffle=False, num_workers=4
     )
