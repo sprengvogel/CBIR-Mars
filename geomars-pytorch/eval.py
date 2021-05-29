@@ -7,13 +7,14 @@ from tqdm import tqdm
 from torchvision import transforms, datasets
 import os
 from PIL import Image
+from data import TripletDataset
 
 if __name__ == '__main__':
 
     #Change current working directory to source file location
-    os.chdir(os.path.dirname(__file__))
+    #os.chdir(os.path.dirname(__file__))
 
-    batch_size = 16
+    batch_size = 1
     num_classes = 15
     # define device
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
@@ -27,7 +28,7 @@ if __name__ == '__main__':
 
     #Load state dict
     state_dict_path = os.path.join(os.getcwd(), "densenet121_pytorch_adapted.pth")
-    
+
     """ state_dict = torch.load(state_dict_path)
     new_state_dict = {}
     for key in state_dict:
@@ -44,19 +45,35 @@ if __name__ == '__main__':
             ]
         )
 
-    ctx_test = datasets.ImageFolder(root="./data/test", transform=data_transform)
+    ctx_test = TripletDataset(root="./data/test", transform=data_transform)
     test_loader = torch.utils.data.DataLoader(
         ctx_test, batch_size=batch_size, shuffle=False, num_workers=4
     )
 
-    tf_last_layer_chopped = nn.Sequential(*list(model.children())[:-1])
+    #tf_last_layer_chopped = nn.Sequential(*list(model.children())[:-1])
+
+    #model = nn.Sequential(
+    #    model,
+    #    nn.AvgPool2d(7)
+    #)
+
+    criterion = nn.TripletMarginLoss()
     model.eval()
-    print(model)
+    running_loss = 0.0
+
     with torch.no_grad():
         for bi, data in tqdm(enumerate(test_loader), total=int(len(ctx_test) / test_loader.batch_size)):
-            image_data = (data[0].to(device))
-            outputs = tf_last_layer_chopped(image_data)
-            for output in outputs:
-                pool = torch.nn.AvgPool2d(7)
-                print(pool(output).shape)
-            break
+            anchor = data[0].to(device)
+            positive = data[1].to(device)
+            negative = data[2].to(device)
+
+            output_anchor = model(anchor)
+            output_pos = model(positive)
+            output_neg = model(negative)
+            loss = criterion(output_anchor, output_pos, output_neg)
+            #print(output_anchor, output_pos, output_neg)
+            # add loss of each item (total items in a batch = batch size)
+            #print(running_loss)
+            running_loss += loss.item()
+    final_loss = running_loss / len(ctx_test)
+    print(f"Test Loss: {final_loss}")

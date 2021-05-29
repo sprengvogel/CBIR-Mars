@@ -54,8 +54,12 @@ if __name__ == '__main__':
 
     feature_dict = {}
 
-    tf_last_layer_chopped = nn.Sequential(*list(model.children())[:-1])
-    pool = torch.nn.AvgPool2d(7)
+    #tf_last_layer_chopped = nn.Sequential(*list(model.children())[:-1])
+    #pool = torch.nn.AvgPool2d(7)
+    model = nn.Sequential(
+        nn.Sequential(*list(model.children())[:-1]),
+        nn.AvgPool2d(7)
+    )
     model.eval()
 
     with torch.no_grad():
@@ -63,9 +67,9 @@ if __name__ == '__main__':
             #if bi > 10:
             #    break
             image_data = (data[0].to(device))
-            output = tf_last_layer_chopped(image_data)
+            output = model(image_data)
 
-            fVector = pool(output).cpu().numpy()
+            #fVector = pool(output).cpu().numpy()
             fVector = fVector.squeeze()
             sample_fname, _ = db_loader.dataset.samples[bi]
             feature_dict[sample_fname] = fVector.tolist()

@@ -1,39 +1,28 @@
 import torch
 import time
+from random import randrange
 import torch.optim as optim
 import torch.nn as nn
 from torch.utils.data import DataLoader, Dataset
 from tqdm import tqdm
 from torchvision import transforms, datasets
-
-class TripletDataset(datasets.ImageFolder):
-
-    #def __init__(self, root, transform):
-    #    super().__init__(root, transform)
-
-    def __getitem__(self, index):
-        print(list(vars(self))[:-1])
-        print(self.class_to_idx)
-        print(self.classes)
-        #print(self.samples)
-        positive_list = self.index[self.index!=item][self.labels[self.index!=item]==anchor_label]
-        negative_list = self.index[self.index!=item][self.labels[self.index!=item]!=anchor_label]
-        print(positive_list)
-        print(negative_list)
-        return super().__getitem__(index)
+from data import TripletDataset
 
 # train the model
 def train(model, dataloader):
     model.train()
     running_loss = 0.0
     for bi, data in tqdm(enumerate(dataloader), total=int(len(ctx_train) / dataloader.batch_size)):
-        image_data = data[0].to(device)
-        label = data[1].to(device)
+        anchor = data[0].to(device)
+        positive = data[1].to(device)
+        negative = data[2].to(device)
         # zero grad the optimizer
         optimizer.zero_grad()
-        outputs = model(image_data)
+        output_anchor = model(anchor)
+        output_pos = model(positive)
+        output_neg = model(negative)
         model.train()
-        loss = criterion(outputs, label)
+        loss = criterion(output_anchor, output_pos, output_neg)
         # backpropagation
         loss.backward()
         # update the parameters
@@ -51,11 +40,14 @@ def validate(model, dataloader, epoch):
 
     with torch.no_grad():
         for bi, data in tqdm(enumerate(dataloader), total=int(len(ctx_val) / dataloader.batch_size)):
-            image_data = (data[0].to(device))
-            label = data[1].to(device)
+            anchor = data[0].to(device)
+            positive = data[1].to(device)
+            negative = data[2].to(device)
 
-            outputs = model(image_data)
-            loss = criterion(outputs, label)
+            output_anchor = model(anchor)
+            output_pos = model(positive)
+            output_neg = model(negative)
+            loss = criterion(output_anchor, output_pos, output_neg)
             # add loss of each item (total items in a batch = batch size)
             running_loss += loss.item()
     final_loss = running_loss / len(ctx_val)
@@ -65,9 +57,9 @@ def validate(model, dataloader, epoch):
 
 if __name__ == '__main__':
 
-    batch_size = 16
-    num_classes = 15
-    epochs = 1
+    batch_size = 8
+    num_classes = 1
+    epochs = 20
 
     data_transform = transforms.Compose(
         [
@@ -103,12 +95,19 @@ if __name__ == '__main__':
     # initialize the model
 
     model = torch.hub.load('pytorch/vision:v0.6.0', 'densenet121', pretrained=True)
-    num_ftrs = model.classifier.in_features
-    model.classifier = nn.Linear(num_ftrs, num_classes)
+    #num_ftrs = model.classifier.in_features
+    #model.classifier = nn.Linear(num_ftrs, num_classes)
+    #model = nn.Sequential(*list(model.children())[:-1])
+
+    model = nn.Sequential(
+        nn.Sequential(*list(model.children())[:-1]),
+        nn.AvgPool2d(7)
+    )
+
     model.to(device)
 
     # define loss criterion and optimizer. Also initialize learning rate scheduler
-    criterion = nn.CrossEntropyLoss()
+    criterion = nn.TripletMarginLoss()#nn.CrossEntropyLoss()
     optimizer = optim.SGD(model.parameters(), lr=0.0001, momentum=0.9)
 
 
