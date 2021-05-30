@@ -38,14 +38,10 @@ if __name__ == '__main__':
     model = torch.hub.load('pytorch/vision:v0.6.0', 'densenet121', pretrained=False)
     num_ftrs = model.classifier.in_features
     model.classifier = nn.Linear(num_ftrs, num_classes)
-    model = nn.Sequential(
-        nn.Sequential(*list(model.children())[:-1]),
-        nn.AvgPool2d(7)
-    )
     model.to(device)
 
     #Load state dict
-    state_dict_path = os.path.join(os.getcwd(), "outputs/model_best.pth")
+    state_dict_path = os.path.join(os.getcwd(), "densenet121_pytorch_adapted.pth")
 
     """ state_dict = torch.load(state_dict_path)
     new_state_dict = {}
@@ -67,6 +63,8 @@ if __name__ == '__main__':
         )
 
 
+
+    tf_last_layer_chopped = nn.Sequential(*list(model.children())[:-1])
     model.eval()
     #print(model)
     with torch.no_grad():
@@ -75,14 +73,14 @@ if __name__ == '__main__':
         print(np.array(image).shape)
         image_data = data_transform(image).to(device)
         image_data = image_data.unsqueeze(0)
-        output = model(image_data)
-
-        fVector = output.squeeze().cpu().numpy()
+        output = tf_last_layer_chopped(image_data)
+        pool = torch.nn.AvgPool2d(7)
+        fVector = pool(output).squeeze().cpu().numpy()
         print(fVector)
         image.show()
 
 
-        db_file = open("feature_db.json", "r")
+        db_file = open("feature_db_pretrained_densenet121.json", "r")
         feature_dict = json.load(db_file)
         query = fVector
         matches_list = []

@@ -6,3 +6,4 @@
 /.idea
 /outputs
 feature_db.json
+feature_db_pretrained_densenet121.json

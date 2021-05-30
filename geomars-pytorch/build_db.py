@@ -25,10 +25,15 @@ if __name__ == '__main__':
     model = torch.hub.load('pytorch/vision:v0.6.0', 'densenet121', pretrained=False)
     num_ftrs = model.classifier.in_features
     model.classifier = nn.Linear(num_ftrs, num_classes)
+
+    model = nn.Sequential(
+        nn.Sequential(*list(model.children())[:-1]),
+        nn.AvgPool2d(7)
+    )
     model.to(device)
 
     #Load state dict
-    state_dict_path = os.path.join(os.getcwd(), "densenet121_pytorch_adapted.pth")
+    state_dict_path = os.path.join(os.getcwd(), "outputs/model_best.pth")#densenet121_pytorch_adapted.pth")
     if torch.cuda.is_available():
         model.load_state_dict(torch.load(state_dict_path))
     else:
@@ -56,10 +61,6 @@ if __name__ == '__main__':
 
     #tf_last_layer_chopped = nn.Sequential(*list(model.children())[:-1])
     #pool = torch.nn.AvgPool2d(7)
-    model = nn.Sequential(
-        nn.Sequential(*list(model.children())[:-1]),
-        nn.AvgPool2d(7)
-    )
     model.eval()
 
     with torch.no_grad():
@@ -70,7 +71,7 @@ if __name__ == '__main__':
             output = model(image_data)
 
             #fVector = pool(output).cpu().numpy()
-            fVector = fVector.squeeze()
+            fVector = output.squeeze()
             sample_fname, _ = db_loader.dataset.samples[bi]
             feature_dict[sample_fname] = fVector.tolist()
 
