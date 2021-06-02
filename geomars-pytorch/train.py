@@ -1,15 +1,20 @@
+from numpy import mod
 import torch
 import time
 from random import randrange
+from torch.nn.modules.container import ModuleList
 import torch.optim as optim
 import torch.nn as nn
 from torch.utils.data import DataLoader, Dataset
 from tqdm import tqdm
 from torchvision import transforms, datasets
 from data import TripletDataset
+from CBIRModel import CBIRModel
+import hparams as hp
+from loss import criterion
 
 # train the model
-def train(model, dataloader):
+def train(model, dataloader, densenet):
     model.train()
     running_loss = 0.0
     for bi, data in tqdm(enumerate(dataloader), total=int(len(ctx_train) / dataloader.batch_size)):
@@ -18,6 +23,10 @@ def train(model, dataloader):
         negative = data[2].to(device)
         # zero grad the optimizer
         optimizer.zero_grad()
+        with torch.no_grad():
+            anchor = densenet(anchor)
+            positive = densenet(positive)
+            negative = densenet(negative)
         output_anchor = model(anchor)
         output_pos = model(positive)
         output_neg = model(negative)
@@ -34,7 +43,7 @@ def train(model, dataloader):
     return final_loss
 
 #validate model
-def validate(model, dataloader, epoch):
+def validate(model, dataloader, epoch, densenet):
     model.eval()
     running_loss = 0.0
 
@@ -43,6 +52,10 @@ def validate(model, dataloader, epoch):
             anchor = data[0].to(device)
             positive = data[1].to(device)
             negative = data[2].to(device)
+
+            anchor = densenet(anchor)
+            positive = densenet(positive)
+            negative = densenet(negative)
 
             output_anchor = model(anchor)
             output_pos = model(positive)
@@ -57,10 +70,6 @@ def validate(model, dataloader, epoch):
 
 if __name__ == '__main__':
 
-    batch_size = 8
-    num_classes = 1
-    epochs = 20
-
     data_transform = transforms.Compose(
         [
             transforms.Resize([224, 224]),
@@ -72,7 +81,7 @@ if __name__ == '__main__':
     ctx_train = TripletDataset(root="./data/train", transform=data_transform)
     train_loader = torch.utils.data.DataLoader(
         ctx_train,
-        batch_size=batch_size,
+        batch_size=hp.BATCH_SIZE,
         shuffle=True,
         num_workers=4,
         pin_memory=True,
@@ -80,12 +89,12 @@ if __name__ == '__main__':
 
     ctx_val = TripletDataset(root="./data/val", transform=data_transform)
     val_loader = torch.utils.data.DataLoader(
-        ctx_val, batch_size=batch_size, shuffle=True, num_workers=8
+        ctx_val, batch_size=hp.BATCH_SIZE, shuffle=True, num_workers=8
     )
 
     ctx_test = TripletDataset(root="./data/test", transform=data_transform)
     test_loader = torch.utils.data.DataLoader(
-        ctx_test, batch_size=batch_size, shuffle=False, num_workers=4
+        ctx_test, batch_size=hp.BATCH_SIZE, shuffle=False, num_workers=4
     )
 
     # define device
@@ -94,21 +103,15 @@ if __name__ == '__main__':
 
     # initialize the model
 
-    model = torch.hub.load('pytorch/vision:v0.6.0', 'densenet121', pretrained=True)
-    #num_ftrs = model.classifier.in_features
-    #model.classifier = nn.Linear(num_ftrs, num_classes)
-    #model = nn.Sequential(*list(model.children())[:-1])
+    densenet = torch.hub.load('pytorch/vision:v0.6.0', 'densenet121', pretrained=True)
+    #densenet = nn.Sequential(*list(densenet.children())[:-1])
+    densenet.to(device)
 
-    model = nn.Sequential(
-        nn.Sequential(*list(model.children())[:-1]),
-        nn.AvgPool2d(7)
-    )
-
+    model = CBIRModel()
     model.to(device)
 
-    # define loss criterion and optimizer. Also initialize learning rate scheduler
-    criterion = nn.TripletMarginLoss()#nn.CrossEntropyLoss()
-    optimizer = optim.SGD(model.parameters(), lr=0.0001, momentum=0.9)
+    # define optimizer. Also initialize learning rate scheduler
+    optimizer = optim.Adam(model.parameters(), lr=hp.LR, betas=hp.ADAM_BETAS)
 
 
     train_loss, val_loss = [], []
@@ -117,10 +120,10 @@ if __name__ == '__main__':
     best_epoch = 0
 
     # start training and validating
-    for epoch in range(epochs):
-        print(f"Epoch {epoch + 1} of {epochs}")
-        train_epoch_loss = train(model, train_loader)
-        val_epoch_loss = validate(model, val_loader, epoch)
+    for epoch in range(hp.EPOCHS):
+        print(f"Epoch {epoch + 1} of {hp.EPOCHS}")
+        train_epoch_loss = train(model, train_loader, densenet)
+        val_epoch_loss = validate(model, val_loader, epoch, densenet)
         # save model with best loss
         if val_epoch_loss < best_loss:
             best_epoch = epoch
