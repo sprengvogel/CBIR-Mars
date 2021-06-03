@@ -10,7 +10,7 @@ import os
 from PIL import Image
 import sys
 import numpy as np
-import json
+import pickle
 import hparams as hp
 from CBIRModel import CBIRModel
 from scipy.spatial.distance import hamming
@@ -79,14 +79,13 @@ if __name__ == '__main__':
         image.show()
 
 
-        with open("feature_db.json", "r") as db_file:
-            feature_dict = json.load(db_file)
+        feature_dict = pickle.load(open("feature_db.p", "rb"))
         query = hashCode
         #print(hashCode)
         matches_list = []
         for key in feature_dict.keys():
             #print(np.array(feature_dict[key]))
-            dist = hamming(query, np.array(feature_dict[key]))
+            dist = hamming(query, np.array(feature_dict[key][0]))
             matches_list.append( (key, dist))
             #print(dist)
 

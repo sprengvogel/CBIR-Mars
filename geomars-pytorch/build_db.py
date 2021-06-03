@@ -8,7 +8,7 @@ from tqdm import tqdm
 from torchvision import transforms, datasets
 import os
 from PIL import Image
-import json
+import pickle
 from CBIRModel import CBIRModel
 import hparams as hp
 import numpy as np
@@ -62,7 +62,9 @@ if __name__ == '__main__':
 
     with torch.no_grad():
         for bi, data in tqdm(enumerate(db_loader), total=int(len(ctx_train))):# / db_loader.batch_size)):
-            image_data = (data[0].to(device))
+            image_data,image_label = data
+            image_label = image_label.cpu().detach().numpy()[0]
+            image_data = image_data.to(device)
             dense_image_data = densenet(image_data)
             output = model(dense_image_data)
             output = output.cpu().detach().numpy()
@@ -70,10 +72,8 @@ if __name__ == '__main__':
             hashCode = np.empty(hp.HASH_BITS).astype(np.int8)
             hashCode = ((np.sign(output -0.5)+1)/2)
             #print(output)
-            print(hashCode)
+            #print(hashCode)
             sample_fname, _ = db_loader.dataset.samples[bi]
-            feature_dict[sample_fname] = hashCode.tolist()
-
-    db_file = open("feature_db.json", "w")
-    db_file.write(json.dumps(feature_dict))
-    db_file.close()
+            feature_dict[sample_fname] = (hashCode.tolist(), image_label)
+    #print(feature_dict)
+    pickle.dump(feature_dict, open("feature_db.p", "wb"))
