@@ -51,6 +51,7 @@ if __name__ == '__main__':
 
     with torch.no_grad():
         for bi, data in tqdm(enumerate(test_loader), total=int(len(ctx_test) / test_loader.batch_size)):
+            print(data)
             anchor = data[0].to(device)
             positive = data[1].to(device)
             negative = data[2].to(device)
