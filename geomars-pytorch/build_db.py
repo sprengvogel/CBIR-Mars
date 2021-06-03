@@ -2,12 +2,16 @@ import torch
 import time
 import torch.optim as optim
 import torch.nn as nn
+import torch.nn.functional  as F
 from torch.utils.data import DataLoader, Dataset
 from tqdm import tqdm
 from torchvision import transforms, datasets
 import os
 from PIL import Image
 import json
+from CBIRModel import CBIRModel
+import hparams as hp
+import numpy as np
 
 
 if __name__ == '__main__':
@@ -15,20 +19,21 @@ if __name__ == '__main__':
     #Change current working directory to source file location
     os.chdir(os.path.dirname(__file__))
 
-    #batch_size = 16
-    num_classes = 15
     # define device
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     print('Computation device: ', device)
 
     # initialize the model
-    model = torch.hub.load('pytorch/vision:v0.6.0', 'densenet121', pretrained=False)
-    num_ftrs = model.classifier.in_features
-    model.classifier = nn.Linear(num_ftrs, num_classes)
+    densenet = torch.hub.load('pytorch/vision:v0.6.0', 'densenet121', pretrained=True)
+    densenet.to(device)
+    densenet.requires_grad_(False)
+    densenet.eval()
+
+    model = CBIRModel()
     model.to(device)
 
     #Load state dict
-    state_dict_path = os.path.join(os.getcwd(), "densenet121_pytorch_adapted.pth")
+    state_dict_path = os.path.join(os.getcwd(), "outputs/model_best.pth")
     if torch.cuda.is_available():
         model.load_state_dict(torch.load(state_dict_path))
     else:
@@ -53,22 +58,21 @@ if __name__ == '__main__':
     )
 
     feature_dict = {}
-
-    tf_last_layer_chopped = nn.Sequential(*list(model.children())[:-1])
-    pool = torch.nn.AvgPool2d(7)
     model.eval()
 
     with torch.no_grad():
         for bi, data in tqdm(enumerate(db_loader), total=int(len(ctx_train))):# / db_loader.batch_size)):
-            #if bi > 10:
-            #    break
             image_data = (data[0].to(device))
-            output = tf_last_layer_chopped(image_data)
+            dense_image_data = densenet(image_data)
+            output = model(dense_image_data)
+            output = output.cpu().detach().numpy()
 
-            fVector = pool(output).cpu().numpy()
-            fVector = fVector.squeeze()
+            hashCode = np.empty(hp.HASH_BITS).astype(np.int8)
+            hashCode = ((np.sign(output -0.5)+1)/2)
+            #print(output)
+            print(hashCode)
             sample_fname, _ = db_loader.dataset.samples[bi]
-            feature_dict[sample_fname] = fVector.tolist()
+            feature_dict[sample_fname] = hashCode.tolist()
 
     db_file = open("feature_db.json", "w")
     db_file.write(json.dumps(feature_dict))

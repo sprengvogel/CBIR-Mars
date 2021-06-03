@@ -1,8 +1,11 @@
 /data
+/data_small
 /models
 /results
 /lightning_logs
 /src/__pycache__
 /.idea
 /outputs
+densenet121.pth
 feature_db.json
+feature_db_pretrained_densenet121.json
