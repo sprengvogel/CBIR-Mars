@@ -94,11 +94,13 @@ if __name__ == '__main__':
 
     matches_list.sort(key= lambda x : x[1])
     images = []
-    for match in matches_list[:25]:
+    rows = 2
+    cols = 3
+    for match in matches_list[:rows*cols]:
         image = Image.open(match[0])
         #image.show()
         images.append(image)
-    grid = image_grid(images, 5, 5)
+    grid = image_grid(images, rows, cols)
     grid.show()
 
 
