@@ -94,8 +94,8 @@ if __name__ == '__main__':
 
     matches_list.sort(key= lambda x : x[1])
     images = []
-    rows = 2
-    cols = 3
+    rows = 1
+    cols = 4
     for match in matches_list[:rows*cols]:
         image = Image.open(match[0])
         #image.show()
