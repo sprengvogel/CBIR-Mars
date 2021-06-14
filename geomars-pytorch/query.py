@@ -34,11 +34,6 @@ if __name__ == '__main__':
     print('Computation device: ', device)
 
     # initialize the model
-    densenet = torch.hub.load('pytorch/vision:v0.6.0', 'densenet121', pretrained=True)
-    densenet.to(device)
-    densenet.requires_grad_(False)
-    densenet.eval()
-
     model = CBIRModel()
     model.to(device)
 
@@ -69,8 +64,7 @@ if __name__ == '__main__':
         image_data = data_transform(image).to(device)
         image_data = image_data.unsqueeze(0)
 
-        dense_image_data = densenet(image_data)
-        output = model(dense_image_data)
+        output = model(image_data)
 
         output = output.cpu().detach().numpy()
         hashCode = np.empty(hp.HASH_BITS).astype(np.int8)
