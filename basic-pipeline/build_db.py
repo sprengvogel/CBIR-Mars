@@ -63,12 +63,16 @@ if __name__ == '__main__':
             #if bi > 10:
             #    break
             image_data = (data[0].to(device))
+            image_label = int(data[1])
             output = tf_last_layer_chopped(image_data)
 
             fVector = pool(output).cpu().numpy()
             fVector = fVector.squeeze()
             sample_fname, _ = db_loader.dataset.samples[bi]
-            feature_dict[sample_fname] = fVector.tolist()
+            feature_dict[sample_fname] = (fVector.tolist(), image_label)
+
+            #fVector = pool(output).cpu().numpy()
+
 
     db_file = open("feature_db.json", "w")
     db_file.write(json.dumps(feature_dict))
