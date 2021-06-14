@@ -1,45 +1,56 @@
-from numpy import mod
 import torch
 import time
-from random import randrange
-from torch.nn.modules.container import ModuleList
 import torch.optim as optim
-import torch.nn as nn
 import torch.nn.functional as F
-from torch.utils.data import DataLoader, Dataset
+from torch.utils.data import DataLoader
 from tqdm import tqdm
-from torchvision import transforms, datasets
-from data import TripletDataset
-from CBIRModel import CBIRModel
+from torchvision import transforms
+from data import MultiviewDataset
 import hparams as hp
-from loss import criterion
 import matplotlib.pyplot as plt
+from SimCLRModel import SimCLR
+
+
+def contrastive_loss(z_i, z_j):
+
+    # https://github.com/leftthomas/SimCLR/blob/master/main.py
+
+    batch_size = z_i.size()[0]
+
+    temperature = 0.5
+    out = torch.cat([z_i, z_j], dim=0)
+    # [2*B, 2*B]
+    #sim_matrix = torch.exp(torch.mm(out, out.t().contiguous()) / temperature)
+    sim_matrix = F.cosine_similarity(out.unsqueeze(1), out.unsqueeze(0), dim=2)
+    mask = (torch.ones_like(sim_matrix) - torch.eye(2 * batch_size, device=sim_matrix.device)).bool()
+
+    # [2*B, 2*B-1]
+    sim_matrix = sim_matrix.masked_select(mask).view(2 * batch_size, -1)
+
+    # compute loss
+    pos_sim = torch.exp(torch.sum(z_i * z_j, dim=-1) / temperature)
+    # [2*B]
+    pos_sim = torch.cat([pos_sim, pos_sim], dim=0)
+    loss = (- torch.log(pos_sim / sim_matrix.sum(dim=-1))).mean()
+    return loss
 
 
 # train the model
-def train(model, dataloader, densenet):
+def train(model, dataloader):
     model.train()
     running_loss = 0.0
     for bi, data in tqdm(enumerate(dataloader), total=int(len(ctx_train) / dataloader.batch_size)):
-        anchor = data[0].to(device)
-        positive = data[1].to(device)
-        negative = data[2].to(device)
+        x_i = data[0].to(device)
+        x_j = data[1].to(device)
+
+        z_i, z_j = model(x_i), model(x_j)
+
+        loss = contrastive_loss(z_i, z_j)
 
         # zero grad the optimizer
         optimizer.zero_grad()
-
-        dense_anchor = densenet(anchor)
-        dense_positive = densenet(positive)
-        dense_negative = densenet(negative)
-
-        output_anchor = model(dense_anchor)
-        output_pos = model(dense_positive)
-        output_neg = model(dense_negative)
-        #model.train()
-        loss = criterion(output_anchor, output_pos, output_neg)
         # backpropagation
         loss.backward()
-        #plot_grad_flow(model.named_parameters())
         # update the parameters
         optimizer.step()
         # add loss of each item (total items in a batch = batch size)
@@ -50,25 +61,18 @@ def train(model, dataloader, densenet):
 
 
 #validate model
-def validate(model, dataloader, epoch, densenet):
+def validate(model, dataloader):
     model.eval()
     running_loss = 0.0
 
     with torch.no_grad():
         for bi, data in tqdm(enumerate(dataloader), total=int(len(ctx_val) / dataloader.batch_size)):
-            anchor = data[0].to(device)
-            positive = data[1].to(device)
-            negative = data[2].to(device)
+            x_i = data[0].to(device)
+            x_j = data[1].to(device)
 
-            dense_anchor = densenet(anchor)
-            dense_positive = densenet(positive)
-            dense_negative = densenet(negative)
+            z_i, z_j = model(x_i), model(x_j)
 
-            output_anchor = model(dense_anchor)
-            output_pos = model(dense_positive)
-            output_neg = model(dense_negative)
-
-            loss = criterion(output_anchor, output_pos, output_neg)
+            loss = contrastive_loss(z_i, z_j)
             # add loss of each item (total items in a batch = batch size)
             running_loss += loss.item()
     final_loss = running_loss / len(ctx_val)
@@ -103,7 +107,7 @@ if __name__ == '__main__':
         ]
     )
 
-    ctx_train = TripletDataset(root="./data/train", transform=data_transform)
+    ctx_train = MultiviewDataset(root="./data/train", transform=data_transform)
     train_loader = torch.utils.data.DataLoader(
         ctx_train,
         batch_size=hp.BATCH_SIZE,
@@ -112,12 +116,12 @@ if __name__ == '__main__':
         pin_memory=True,
     )
 
-    ctx_val = TripletDataset(root="./data/val", transform=data_transform)
+    ctx_val = MultiviewDataset(root="./data/val", transform=data_transform)
     val_loader = torch.utils.data.DataLoader(
         ctx_val, batch_size=hp.BATCH_SIZE, shuffle=True, num_workers=8
     )
 
-    ctx_test = TripletDataset(root="./data/test", transform=data_transform)
+    ctx_test = MultiviewDataset(root="./data/test", transform=data_transform)
     test_loader = torch.utils.data.DataLoader(
         ctx_test, batch_size=hp.BATCH_SIZE, shuffle=False, num_workers=4
     )
@@ -128,13 +132,7 @@ if __name__ == '__main__':
 
     # initialize the model
 
-    densenet = torch.hub.load('pytorch/vision:v0.6.0', 'densenet121', pretrained=True)
-    #densenet = nn.Sequential(*list(densenet.children())[:-1])
-    densenet.to(device)
-    densenet.requires_grad_(False)
-    densenet.eval()
-
-    model = CBIRModel()
+    model = SimCLR(hp.HASH_BITS)
     model.to(device)
 
     # define optimizer. Also initialize learning rate scheduler
@@ -149,8 +147,8 @@ if __name__ == '__main__':
     # start training and validating
     for epoch in range(hp.EPOCHS):
         print(f"Epoch {epoch + 1} of {hp.EPOCHS}")
-        train_epoch_loss = train(model, train_loader, densenet)
-        val_epoch_loss = validate(model, val_loader, epoch, densenet)
+        train_epoch_loss = train(model, train_loader)
+        val_epoch_loss = validate(model, val_loader)
         # save model with best loss
         if val_epoch_loss < best_loss:
             best_epoch = epoch

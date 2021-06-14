@@ -11,7 +11,7 @@ def init_weights(m):
 class CBIRModel(nn.Module):
     def __init__(self):
         super(CBIRModel, self).__init__()
-        self.lin1 = nn.Linear(hp.DENSENET_NUM_FEATURES, 500)
+        self.lin1 = nn.Linear(hp.NUM_CLASSES, 500)
         init_weights(self.lin1)
         self.leakyrelu1 = nn.LeakyReLU(negative_slope=hp.MARGIN)
         self.lin2 = nn.Linear(500, 250)
@@ -28,4 +28,5 @@ class CBIRModel(nn.Module):
         #print(nn.Sigmoid()(output))
         #print(F.normalize(nn.Sigmoid()(output),1).shape)
         #print(F.normalize(nn.Sigmoid()(output),1))
-        return nn.Sigmoid()(output)
+        # return nn.Sigmoid()(output)
+        return torch.tanh(output)

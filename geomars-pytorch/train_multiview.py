@@ -9,32 +9,86 @@ import torch.nn.functional as F
 from torch.utils.data import DataLoader, Dataset
 from tqdm import tqdm
 from torchvision import transforms, datasets
-from data import TripletDataset
+from data import TripletDataset, MultiviewDataset
 from CBIRModel import CBIRModel
 import hparams as hp
 from loss import criterion
 import matplotlib.pyplot as plt
+import numpy as np
+from multiviewModel import MultiviewNet
+import math
 
+
+def computeV(Qmc):
+
+    V = np.sum(np.abs(Qmc - np.mean(Qmc)))
+
+    return V / len(Qmc)
+
+
+def computeE(view1, view2):
+    E = []
+    num_images = len(view1)
+    Q = np.zeros((hp.NUM_VIEWS, num_images, hp.NUM_CLASSES))
+    Q[0, :, :] = view1
+    Q[1, :, :] = view2
+
+    for m in range(hp.NUM_VIEWS):
+        result = 0
+        # c_index = np.argmax(Q[m, :, :], axis=1)
+        # c_max = np.amax(Q[m, :, :], axis=1)
+        # c_max_index = np.argmax(c_max)
+        V = []
+        V_sum = 0
+        for c in range(hp.NUM_CLASSES):
+            V.append(computeV(Q[m, :, c]))
+            V_sum = math.sqrt(computeV(Q[m, :, c]))
+        result += math.sqrt(max(V))
+        result -= V_sum / num_images
+        E.append(result)
+
+    E = np.asarray(E)
+    for m in range(hp.NUM_VIEWS):
+        E[m] = math.log(E[m] + np.abs(np.min(E)) + 1) / math.log(np.max(np.abs(E)) + np.abs(np.min(E)) + 1)
+    return E
+
+
+def computeL(B, labels):
+    # B1 = B[0::2]
+    # labels1 = labels[0::2]
+    # B2 = B[1::2]
+    # labels2 = labels[1::2]
+
+    Y = np.zeros((len(B), len(B)))
+    for i in range(len(B)):
+        for j in range(len(B)):
+            if labels[i] == labels[j]:
+                Y[i][j] = 1
+            else:
+                Y[i][j] = -1
+    return 0
 
 # train the model
 def train(model, dataloader, densenet):
     model.train()
     running_loss = 0.0
     for bi, data in tqdm(enumerate(dataloader), total=int(len(ctx_train) / dataloader.batch_size)):
-        anchor = data[0].to(device)
-        positive = data[1].to(device)
-        negative = data[2].to(device)
-
+        view1 = data[0].to(device)
+        view2 = data[1].to(device)
+        labels = data[2].to(device)
         # zero grad the optimizer
         optimizer.zero_grad()
 
-        dense_anchor = densenet(anchor)
-        dense_positive = densenet(positive)
-        dense_negative = densenet(negative)
+        dense_view1 = densenet(view1)
+        dense_view2 = densenet(view2)
 
-        output_anchor = model(dense_anchor)
-        output_pos = model(dense_positive)
-        output_neg = model(dense_negative)
+        E = computeE(dense_view1, dense_view2)
+
+        output_view1 = model(dense_view1)
+        output_view2 = model(dense_view2)
+
+        L1 = computeL(output_view1, labels)
+
         #model.train()
         loss = criterion(output_anchor, output_pos, output_neg)
         # backpropagation
@@ -56,13 +110,12 @@ def validate(model, dataloader, epoch, densenet):
 
     with torch.no_grad():
         for bi, data in tqdm(enumerate(dataloader), total=int(len(ctx_val) / dataloader.batch_size)):
-            anchor = data[0].to(device)
-            positive = data[1].to(device)
+            view1 = data[0].to(device)
+            view2 = data[1].to(device)
             negative = data[2].to(device)
 
-            dense_anchor = densenet(anchor)
-            dense_positive = densenet(positive)
-            dense_negative = densenet(negative)
+            dense_view1 = densenet(view1)
+            dense_view2 = densenet(view2)
 
             output_anchor = model(dense_anchor)
             output_pos = model(dense_positive)
@@ -97,13 +150,12 @@ if __name__ == '__main__':
 
     data_transform = transforms.Compose(
         [
-            transforms.Resize([224, 224]),
             transforms.ToTensor(),
             transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
         ]
     )
 
-    ctx_train = TripletDataset(root="./data/train", transform=data_transform)
+    ctx_train = MultiviewDataset(root="./data/train", transform=data_transform)
     train_loader = torch.utils.data.DataLoader(
         ctx_train,
         batch_size=hp.BATCH_SIZE,
@@ -112,12 +164,12 @@ if __name__ == '__main__':
         pin_memory=True,
     )
 
-    ctx_val = TripletDataset(root="./data/val", transform=data_transform)
+    ctx_val = MultiviewDataset(root="./data/val", transform=data_transform)
     val_loader = torch.utils.data.DataLoader(
         ctx_val, batch_size=hp.BATCH_SIZE, shuffle=True, num_workers=8
     )
 
-    ctx_test = TripletDataset(root="./data/test", transform=data_transform)
+    ctx_test = MultiviewDataset(root="./data/test", transform=data_transform)
     test_loader = torch.utils.data.DataLoader(
         ctx_test, batch_size=hp.BATCH_SIZE, shuffle=False, num_workers=4
     )
@@ -128,11 +180,17 @@ if __name__ == '__main__':
 
     # initialize the model
 
-    densenet = torch.hub.load('pytorch/vision:v0.6.0', 'densenet121', pretrained=True)
-    #densenet = nn.Sequential(*list(densenet.children())[:-1])
-    densenet.to(device)
+    # densenet = torch.hub.load('pytorch/vision:v0.6.0', 'densenet121', pretrained=True)
+    # #densenet = nn.Sequential(*list(densenet.children())[:-1])
+    # densenet.fc = nn.Linear(1000, len(ctx_train.classes))
+    # densenet.to(device)
+    # densenet.requires_grad_(False)
+    # densenet.eval()
+    densenet = MultiviewNet()
+    path = 'outputs/view1_net.pth'
+    densenet.load_state_dict(torch.load(path))
     densenet.requires_grad_(False)
-    densenet.eval()
+
 
     model = CBIRModel()
     model.to(device)

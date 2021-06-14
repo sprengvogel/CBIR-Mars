@@ -27,6 +27,7 @@ def image_grid(imgs, rows, cols):
         grid.paste(img, box=(i % cols * w, i // cols * h))
     return grid
 
+
 if __name__ == '__main__':
 
     # define device
@@ -91,10 +92,10 @@ if __name__ == '__main__':
 
     matches_list.sort(key= lambda x : x[1])
     images = []
-    for match in matches_list[:64]:
+    for match in matches_list[:36]:
         image = Image.open(match[0])
         images.append(image)
-    grid = image_grid(images, 8, 8)
+    grid = image_grid(images, 6, 6)
     grid.show()
 
 

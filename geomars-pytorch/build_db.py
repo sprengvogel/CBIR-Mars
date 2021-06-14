@@ -62,7 +62,7 @@ if __name__ == '__main__':
 
     with torch.no_grad():
         for bi, data in tqdm(enumerate(db_loader), total=int(len(ctx_train))):# / db_loader.batch_size)):
-            image_data,image_label = data
+            image_data, image_label = data
             image_label = image_label.cpu().detach().numpy()[0]
             image_data = image_data.to(device)
             dense_image_data = densenet(image_data)

@@ -2,6 +2,8 @@ from torch import nn
 import torch
 import hparams as hp
 
+def contrastive_los():
+    pass 
 def criterion(anchor, pos, neg):
     tripletLoss = nn.TripletMarginLoss(margin=1)
     pushLoss = nn.MSELoss(reduction='sum')
