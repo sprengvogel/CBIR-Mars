@@ -16,7 +16,7 @@ from loss import criterion
 import matplotlib.pyplot as plt
 
 # train the model
-def train(model, dataloader, densenet):
+def train(model, dataloader):
     model.train()
     running_loss = 0.0
     for bi, data in tqdm(enumerate(dataloader), total=int(len(ctx_train) / dataloader.batch_size)):
@@ -25,12 +25,9 @@ def train(model, dataloader, densenet):
         negative = data[2].to(device)
         # zero grad the optimizer
         optimizer.zero_grad()
-        dense_anchor = densenet(anchor)
-        dense_positive = densenet(positive)
-        dense_negative = densenet(negative)
-        output_anchor = model(dense_anchor)
-        output_pos = model(dense_positive)
-        output_neg = model(dense_negative)
+        output_anchor = model(anchor)
+        output_pos = model(positive)
+        output_neg = model(negative)
         #model.train()
         loss = criterion(output_anchor, output_pos, output_neg)
         # backpropagation
@@ -45,7 +42,7 @@ def train(model, dataloader, densenet):
     return final_loss
 
 #validate model
-def validate(model, dataloader, epoch, densenet):
+def validate(model, dataloader, epoch):
     model.eval()
     running_loss = 0.0
 
@@ -55,13 +52,9 @@ def validate(model, dataloader, epoch, densenet):
             positive = data[1].to(device)
             negative = data[2].to(device)
 
-            dense_anchor = densenet(anchor)
-            dense_positive = densenet(positive)
-            dense_negative = densenet(negative)
-
-            output_anchor = model(dense_anchor)
-            output_pos = model(dense_positive)
-            output_neg = model(dense_negative)
+            output_anchor = model(anchor)
+            output_pos = model(positive)
+            output_neg = model(negative)
 
             loss = criterion(output_anchor, output_pos, output_neg)
             # add loss of each item (total items in a batch = batch size)
@@ -120,13 +113,6 @@ if __name__ == '__main__':
     print('Computation device: ', device)
 
     # initialize the model
-
-    densenet = torch.hub.load('pytorch/vision:v0.6.0', 'densenet121', pretrained=True)
-    #densenet = nn.Sequential(*list(densenet.children())[:-1])
-    densenet.to(device)
-    densenet.requires_grad_(False)
-    densenet.eval()
-
     model = CBIRModel()
     model.to(device)
 
@@ -142,8 +128,8 @@ if __name__ == '__main__':
     # start training and validating
     for epoch in range(hp.EPOCHS):
         print(f"Epoch {epoch + 1} of {hp.EPOCHS}")
-        train_epoch_loss = train(model, train_loader, densenet)
-        val_epoch_loss = validate(model, val_loader, epoch, densenet)
+        train_epoch_loss = train(model, train_loader)
+        val_epoch_loss = validate(model, val_loader, epoch)
         # save model with best loss
         if val_epoch_loss < best_loss:
             best_epoch = epoch

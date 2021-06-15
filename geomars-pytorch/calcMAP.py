@@ -50,10 +50,6 @@ if __name__ == '__main__':
     print('Computation device: ', device)
 
     # initialize the model
-    densenet = torch.hub.load('pytorch/vision:v0.6.0', 'densenet121', pretrained=True)
-    densenet.to(device)
-    densenet.eval()
-
     model = CBIRModel()
     model.to(device)
 
@@ -92,7 +88,6 @@ if __name__ == '__main__':
             image_data,image_label = data
             image_data = image_data.to(device)
             image_label = image_label.cpu().detach().numpy()[0]
-            image_data = densenet(image_data)
             output = model(image_data)
 
             output = output.cpu().detach().numpy()
