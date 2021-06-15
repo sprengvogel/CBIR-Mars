@@ -65,7 +65,7 @@ class TripletDataset(datasets.ImageFolder):
             positive = self.transform(positive)
             negative = self.transform(negative)
 
-        return anchor, positive, negative
+        return (anchor_path, anchor), (positive_path, positive), (negative_path, negative)
 
     def __len__(self):
         return len(self.samples)

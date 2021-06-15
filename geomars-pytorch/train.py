@@ -14,15 +14,17 @@ from CBIRModel import CBIRModel
 import hparams as hp
 from loss import criterion
 import matplotlib.pyplot as plt
+import pickle
+from pathlib import Path
 
 # train the model
-def train(model, dataloader):
+def train(model, dataloader, train_dict):
     model.train()
     running_loss = 0.0
     for bi, data in tqdm(enumerate(dataloader), total=int(len(ctx_train) / dataloader.batch_size)):
-        anchor = data[0].to(device)
-        positive = data[1].to(device)
-        negative = data[2].to(device)
+        anchor = torch.stack([train_dict[x] for x in data[0][0]])
+        positive = torch.stack([train_dict[x] for x in data[1][0]])
+        negative = torch.stack([train_dict[x] for x in data[2][0]])
         # zero grad the optimizer
         optimizer.zero_grad()
         output_anchor = model(anchor)
@@ -42,15 +44,15 @@ def train(model, dataloader):
     return final_loss
 
 #validate model
-def validate(model, dataloader, epoch):
+def validate(model, dataloader, val_dict, epoch):
     model.eval()
     running_loss = 0.0
 
     with torch.no_grad():
         for bi, data in tqdm(enumerate(dataloader), total=int(len(ctx_val) / dataloader.batch_size)):
-            anchor = data[0].to(device)
-            positive = data[1].to(device)
-            negative = data[2].to(device)
+            anchor = torch.stack([val_dict[x] for x in data[0][0]])
+            positive = torch.stack([val_dict[x] for x in data[1][0]])
+            negative = torch.stack([val_dict[x] for x in data[2][0]])
 
             output_anchor = model(anchor)
             output_pos = model(positive)
@@ -112,8 +114,56 @@ if __name__ == '__main__':
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     print('Computation device: ', device)
 
+    #Use densenet on every image
+    ctx_train_densenet = datasets.ImageFolder(root="./data/train", transform=data_transform)
+    train_loader_densenet = torch.utils.data.DataLoader(
+        ctx_train_densenet,
+        batch_size=1,
+        shuffle=False,
+        num_workers=4,
+        pin_memory=True,
+    )
+    ctx_val_densenet = datasets.ImageFolder(root="./data/val", transform=data_transform)
+    val_loader_densenet = torch.utils.data.DataLoader(
+        ctx_val_densenet,
+        batch_size=1,
+        shuffle=False,
+        num_workers=4,
+        pin_memory=True,
+    )
+    encoder = torch.hub.load('pytorch/vision:v0.6.0', 'densenet121', pretrained=True)
+    encoder = torch.nn.Sequential(*(list(encoder.children())[:-1]), nn.AvgPool2d(7))
+    encoder.requires_grad_(False)
+    encoder.eval()
+    encoder.to(device)
+    train_file_path = Path("./train.p")
+    if train_file_path.is_file():
+        train_dict = pickle.load(open("train.p","rb"))
+    else:
+        train_dict = {}
+        for bi, data in tqdm(enumerate(train_loader_densenet), total=int(len(ctx_train_densenet) / train_loader_densenet.batch_size)):
+            image_data,image_label = data
+            sample_fname, _ = train_loader_densenet.dataset.samples[bi]
+            image_data = image_data.to(device)
+            output = encoder(image_data).squeeze().detach().clone()
+            train_dict[sample_fname] = output
+        pickle.dump(train_dict, open("train.p", "wb"))
+        
+    val_file_path = Path("./val.p")
+    if val_file_path.is_file():
+        val_dict = pickle.load(open("val.p","rb"))
+    else:
+        val_dict = {}
+        for bi, data in tqdm(enumerate(val_loader_densenet), total=int(len(ctx_val_densenet) / val_loader_densenet.batch_size)):
+            image_data,image_label = data
+            sample_fname, _ = val_loader_densenet.dataset.samples[bi]
+            image_data = image_data.to(device)
+            output = encoder(image_data).squeeze().detach().clone()
+            val_dict[sample_fname] = output
+        pickle.dump(val_dict, open("val.p", "wb"))
+
     # initialize the model
-    model = CBIRModel()
+    model = CBIRModel(useEncoder=False)
     model.to(device)
 
     # define optimizer. Also initialize learning rate scheduler
@@ -128,8 +178,8 @@ if __name__ == '__main__':
     # start training and validating
     for epoch in range(hp.EPOCHS):
         print(f"Epoch {epoch + 1} of {hp.EPOCHS}")
-        train_epoch_loss = train(model, train_loader)
-        val_epoch_loss = validate(model, val_loader, epoch)
+        train_epoch_loss = train(model, train_loader, train_dict)
+        val_epoch_loss = validate(model, val_loader, val_dict, epoch)
         # save model with best loss
         if val_epoch_loss < best_loss:
             best_epoch = epoch
