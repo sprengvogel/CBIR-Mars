@@ -16,9 +16,6 @@ import numpy as np
 
 if __name__ == '__main__':
 
-    #Change current working directory to source file location
-    os.chdir(os.path.dirname(__file__))
-
     # define device
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     print('Computation device: ', device)

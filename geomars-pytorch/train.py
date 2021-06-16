@@ -9,7 +9,7 @@ import torch.nn.functional as F
 from torch.utils.data import DataLoader, Dataset
 from tqdm import tqdm
 from torchvision import transforms, datasets
-from data import TripletDataset
+from data import TripletDataset, InterClassTripletDataset
 from CBIRModel import CBIRModel
 import hparams as hp
 from loss import criterion
@@ -25,6 +25,7 @@ def train(model, dataloader, train_dict):
         anchor = torch.stack([train_dict[x] for x in data[0][0]])
         positive = torch.stack([train_dict[x] for x in data[1][0]])
         negative = torch.stack([train_dict[x] for x in data[2][0]])
+
         # zero grad the optimizer
         optimizer.zero_grad()
         output_anchor = model(anchor)
@@ -32,6 +33,14 @@ def train(model, dataloader, train_dict):
         output_neg = model(negative)
         #model.train()
         loss = criterion(output_anchor, output_pos, output_neg)
+
+        if hp.INTERCLASSTRIPLETS == True:
+            ic_positive = torch.stack([train_dict[x] for x in data[3][0]])
+            ic_negative = torch.stack([train_dict[x] for x in data[4][0]])
+            ic_output_pos = model(ic_positive)
+            ic_output_neg = model(ic_negative)
+
+            loss += criterion(output_anchor, ic_output_pos, ic_output_neg)
         # backpropagation
         loss.backward()
         #plot_grad_flow(model.named_parameters())
@@ -59,6 +68,15 @@ def validate(model, dataloader, val_dict, epoch):
             output_neg = model(negative)
 
             loss = criterion(output_anchor, output_pos, output_neg)
+
+            if hp.INTERCLASSTRIPLETS == True:
+                ic_positive = torch.stack([val_dict[x] for x in data[3][0]])
+                ic_negative = torch.stack([val_dict[x] for x in data[4][0]])
+                ic_output_pos = model(ic_positive)
+                ic_output_neg = model(ic_negative)
+
+                loss += criterion(output_anchor, ic_output_pos, ic_output_neg)
+
             # add loss of each item (total items in a batch = batch size)
             running_loss += loss.item()
     final_loss = running_loss / len(ctx_val)
@@ -91,19 +109,34 @@ if __name__ == '__main__':
         ]
     )
 
-    ctx_train = TripletDataset(root="./data/train", transform=data_transform)
-    train_loader = torch.utils.data.DataLoader(
-        ctx_train,
-        batch_size=hp.BATCH_SIZE,
-        shuffle=True,
-        num_workers=4,
-        pin_memory=True,
-    )
+    if hp.INTERCLASSTRIPLETS == True:
+        ctx_train = InterClassTripletDataset(root="./data/train", transform=data_transform)
+        train_loader = torch.utils.data.DataLoader(
+            ctx_train,
+            batch_size=hp.BATCH_SIZE,
+            shuffle=True,
+            num_workers=4,
+            pin_memory=True,
+        )
 
-    ctx_val = TripletDataset(root="./data/val", transform=data_transform)
-    val_loader = torch.utils.data.DataLoader(
-        ctx_val, batch_size=hp.BATCH_SIZE, shuffle=True, num_workers=8
-    )
+        ctx_val = InterClassTripletDataset(root="./data/val", transform=data_transform)
+        val_loader = torch.utils.data.DataLoader(
+            ctx_val, batch_size=hp.BATCH_SIZE, shuffle=True, num_workers=8
+        )
+    else:
+        ctx_train = TripletDataset(root="./data/train", transform=data_transform)
+        train_loader = torch.utils.data.DataLoader(
+            ctx_train,
+            batch_size=hp.BATCH_SIZE,
+            shuffle=True,
+            num_workers=4,
+            pin_memory=True,
+        )
+
+        ctx_val = TripletDataset(root="./data/val", transform=data_transform)
+        val_loader = torch.utils.data.DataLoader(
+            ctx_val, batch_size=hp.BATCH_SIZE, shuffle=True, num_workers=8
+        )
 
     ctx_test = TripletDataset(root="./data/test", transform=data_transform)
     test_loader = torch.utils.data.DataLoader(
@@ -148,7 +181,7 @@ if __name__ == '__main__':
             output = encoder(image_data).squeeze().detach().clone()
             train_dict[sample_fname] = output
         pickle.dump(train_dict, open("train.p", "wb"))
-        
+
     val_file_path = Path("./val.p")
     if val_file_path.is_file():
         val_dict = pickle.load(open("val.p","rb"))
