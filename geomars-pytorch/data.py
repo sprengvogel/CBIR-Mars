@@ -16,6 +16,22 @@ def getRandomNumber(start, end, exclude=None):
         number_range.remove(exclude)
     return choice(number_range)
 
+class ImageFolderWithLabel(datasets.ImageFolder):
+
+    def __init__(self, root, transform, test_mode = False):
+        super().__init__(root, transform)
+
+    def __getitem__(self, index):
+
+        sample = self.samples[index]
+        sample_path = sample[0]
+        sample_label = sample[1]
+
+        return (sample_path, sample_label)
+
+    def __len__(self):
+        return len(self.samples)
+
 class TripletDataset(datasets.ImageFolder):
 
     def __init__(self, root, transform, test_mode = False):

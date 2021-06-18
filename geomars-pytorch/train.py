@@ -9,38 +9,43 @@ import torch.nn.functional as F
 from torch.utils.data import DataLoader, Dataset
 from tqdm import tqdm
 from torchvision import transforms, datasets
-from data import TripletDataset, InterClassTripletDataset
+from data import TripletDataset, InterClassTripletDataset, ImageFolderWithLabel
 from CBIRModel import CBIRModel
 import hparams as hp
-from loss import criterion
+from loss import criterion as hashing_criterion
 import matplotlib.pyplot as plt
 import pickle
 from pathlib import Path
+from pytorch_metric_learning import losses, miners, distances, reducers, testers
 
 # train the model
 def train(model, dataloader, train_dict):
     model.train()
     running_loss = 0.0
     for bi, data in tqdm(enumerate(dataloader), total=int(len(ctx_train) / dataloader.batch_size)):
-        anchor = torch.stack([train_dict[x] for x in data[0][0]])
-        positive = torch.stack([train_dict[x] for x in data[1][0]])
-        negative = torch.stack([train_dict[x] for x in data[2][0]])
+        inputs = torch.stack([train_dict[x] for x in data[0]])
+        labels = data[1]
 
         # zero grad the optimizer
         optimizer.zero_grad()
-        output_anchor = model(anchor)
-        output_pos = model(positive)
-        output_neg = model(negative)
-        #model.train()
-        loss = criterion(output_anchor, output_pos, output_neg)
+        embeddings = model(inputs)
 
-        if hp.INTERCLASSTRIPLETS == True:
+        triplet_indices_tuple = triplet_mining(embeddings, labels)
+        triplet_loss = criterion(embeddings, labels, triplet_indices_tuple)
+        #print(triplet_indices_tuple)
+        #print(embeddings)
+        hashing_loss = hashing_criterion(embeddings)
+        #print("triplet loss: ", triplet_loss)
+        #print("combined hash loss: ", hashing_loss)
+        loss = triplet_loss + hashing_loss
+
+        '''if hp.INTERCLASSTRIPLETS == True:
             ic_positive = torch.stack([train_dict[x] for x in data[3][0]])
             ic_negative = torch.stack([train_dict[x] for x in data[4][0]])
             ic_output_pos = model(ic_positive)
             ic_output_neg = model(ic_negative)
 
-            loss += criterion(output_anchor, ic_output_pos, ic_output_neg)
+            loss += criterion(output_anchor, ic_output_pos, ic_output_neg)'''
         # backpropagation
         loss.backward()
         #plot_grad_flow(model.named_parameters())
@@ -59,23 +64,13 @@ def validate(model, dataloader, val_dict, epoch):
 
     with torch.no_grad():
         for bi, data in tqdm(enumerate(dataloader), total=int(len(ctx_val) / dataloader.batch_size)):
-            anchor = torch.stack([val_dict[x] for x in data[0][0]])
-            positive = torch.stack([val_dict[x] for x in data[1][0]])
-            negative = torch.stack([val_dict[x] for x in data[2][0]])
+            inputs = torch.stack([val_dict[x] for x in data[0]])
+            labels = data[1]
 
-            output_anchor = model(anchor)
-            output_pos = model(positive)
-            output_neg = model(negative)
+            embeddings = model(inputs)
 
-            loss = criterion(output_anchor, output_pos, output_neg)
-
-            if hp.INTERCLASSTRIPLETS == True:
-                ic_positive = torch.stack([val_dict[x] for x in data[3][0]])
-                ic_negative = torch.stack([val_dict[x] for x in data[4][0]])
-                ic_output_pos = model(ic_positive)
-                ic_output_neg = model(ic_negative)
-
-                loss += criterion(output_anchor, ic_output_pos, ic_output_neg)
+            triplet_indices_tuple = triplet_mining(embeddings, labels)
+            loss = criterion(embeddings, labels, triplet_indices_tuple) + hashing_criterion(embeddings)
 
             # add loss of each item (total items in a batch = batch size)
             running_loss += loss.item()
@@ -109,38 +104,31 @@ if __name__ == '__main__':
         ]
     )
 
-    if hp.INTERCLASSTRIPLETS == True:
-        ctx_train = InterClassTripletDataset(root="./data/train", transform=data_transform)
-        train_loader = torch.utils.data.DataLoader(
-            ctx_train,
-            batch_size=hp.BATCH_SIZE,
-            shuffle=True,
-            num_workers=4,
-            pin_memory=True,
-        )
 
-        ctx_val = InterClassTripletDataset(root="./data/val", transform=data_transform)
-        val_loader = torch.utils.data.DataLoader(
-            ctx_val, batch_size=hp.BATCH_SIZE, shuffle=True, num_workers=8
-        )
-    else:
-        ctx_train = TripletDataset(root="./data/train", transform=data_transform)
-        train_loader = torch.utils.data.DataLoader(
-            ctx_train,
-            batch_size=hp.BATCH_SIZE,
-            shuffle=True,
-            num_workers=4,
-            pin_memory=True,
-        )
 
-        ctx_val = TripletDataset(root="./data/val", transform=data_transform)
-        val_loader = torch.utils.data.DataLoader(
-            ctx_val, batch_size=hp.BATCH_SIZE, shuffle=True, num_workers=8
-        )
+    ctx_train = ImageFolderWithLabel(root="./data/train", transform=data_transform)
+    train_loader = torch.utils.data.DataLoader(
+        ctx_train,
+        batch_size=hp.BATCH_SIZE,
+        shuffle=True,
+        num_workers=4,
+        pin_memory=True,
+    )
 
-    ctx_test = TripletDataset(root="./data/test", transform=data_transform)
+    ctx_val = ImageFolderWithLabel(root="./data/val", transform=data_transform)
+    val_loader = torch.utils.data.DataLoader(
+        ctx_val,
+        batch_size=hp.BATCH_SIZE,
+        shuffle=True,
+        num_workers=8
+    )
+
+    ctx_test = ImageFolderWithLabel(root="./data/test", transform=data_transform)
     test_loader = torch.utils.data.DataLoader(
-        ctx_test, batch_size=hp.BATCH_SIZE, shuffle=False, num_workers=4
+        ctx_test,
+        batch_size=hp.BATCH_SIZE,
+        shuffle=False,
+        num_workers=4
     )
 
     # define device
@@ -202,6 +190,10 @@ if __name__ == '__main__':
     # define optimizer. Also initialize learning rate scheduler
     optimizer = optim.Adam(model.parameters(), lr=hp.LR, betas=hp.ADAM_BETAS)
 
+    distance = distances.LpDistance()#distances.CosineSimilarity()
+    reducer = reducers.ThresholdReducer(low = 0)#DoNothingReducer()#
+    criterion = losses.TripletMarginLoss(margin = 0.2, distance = distance, reducer = reducer)
+    triplet_mining = miners.TripletMarginMiner(margin = 0.2, distance = distance, type_of_triplets = "hard")
 
     train_loss, val_loss = [], []
     start = time.time()
@@ -226,4 +218,4 @@ if __name__ == '__main__':
     end = time.time()
     #plt.show()
     print(f"Finished training in: {((end - start) / 60):.3f} minutes")
-    print(best_epoch)
+    print(f"Best performing Epoch:: {best_epoch}.")
