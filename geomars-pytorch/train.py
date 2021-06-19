@@ -16,7 +16,7 @@ from loss import criterion as hashing_criterion
 import matplotlib.pyplot as plt
 import pickle
 from pathlib import Path
-from pytorch_metric_learning import losses, miners, distances, reducers, testers
+from pytorch_metric_learning import losses, miners, distances, reducers
 
 # train the model
 def train(model, dataloader, train_dict):
@@ -29,15 +29,21 @@ def train(model, dataloader, train_dict):
         # zero grad the optimizer
         optimizer.zero_grad()
         embeddings = model(inputs)
-
-        triplet_indices_tuple = triplet_mining(embeddings, labels)
-        triplet_loss = criterion(embeddings, labels, triplet_indices_tuple)
-        #print(triplet_indices_tuple)
+        #print("labels: ", labels)
         #print(embeddings)
+        norm_embeddings = F.normalize(embeddings, p=2, dim=1)
+        #print(norm_embeddings)
+
+        triplet_indices_tuple = triplet_mining(norm_embeddings, labels)
+        triplet_loss = triplet_criterion(norm_embeddings, labels, triplet_indices_tuple)
+        #triplet_loss = torch.sum(triplet_loss["loss"]["losses"])
+        #print(triplet_indices_tuple)
+
         hashing_loss = hashing_criterion(embeddings)
         #print("triplet loss: ", triplet_loss)
-        #print("combined hash loss: ", hashing_loss)
+        #print("hash loss: ", hashing_loss)
         loss = triplet_loss + hashing_loss
+        #print("loss: ", loss)
 
         '''if hp.INTERCLASSTRIPLETS == True:
             ic_positive = torch.stack([train_dict[x] for x in data[3][0]])
@@ -53,7 +59,7 @@ def train(model, dataloader, train_dict):
         optimizer.step()
         # add loss of each item (total items in a batch = batch size)
         running_loss += loss.item()
-    final_loss = running_loss / len(ctx_train)
+    final_loss = running_loss / (len(ctx_train) / dataloader.batch_size)
 
     return final_loss
 
@@ -69,12 +75,17 @@ def validate(model, dataloader, val_dict, epoch):
 
             embeddings = model(inputs)
 
-            triplet_indices_tuple = triplet_mining(embeddings, labels)
-            loss = criterion(embeddings, labels, triplet_indices_tuple) + hashing_criterion(embeddings)
+            norm_embeddings = F.normalize(embeddings, p=2, dim=1)
+
+            triplet_indices_tuple = triplet_mining(norm_embeddings, labels)
+            triplet_loss = triplet_criterion(norm_embeddings, labels, triplet_indices_tuple)
+            #triplet_loss = torch.sum(triplet_loss["loss"]["losses"])
+            hashing_loss = hashing_criterion(embeddings)
+            loss = triplet_loss + hashing_loss
 
             # add loss of each item (total items in a batch = batch size)
             running_loss += loss.item()
-    final_loss = running_loss / len(ctx_val)
+    final_loss = running_loss / (len(ctx_val)/ dataloader.batch_size)
 
     return final_loss
 
@@ -190,10 +201,10 @@ if __name__ == '__main__':
     # define optimizer. Also initialize learning rate scheduler
     optimizer = optim.Adam(model.parameters(), lr=hp.LR, betas=hp.ADAM_BETAS)
 
-    distance = distances.LpDistance()#distances.CosineSimilarity()
+    distance = distances.LpDistance()#distances.CosineSimilarity()#
     reducer = reducers.ThresholdReducer(low = 0)#DoNothingReducer()#
-    criterion = losses.TripletMarginLoss(margin = 0.2, distance = distance, reducer = reducer)
-    triplet_mining = miners.TripletMarginMiner(margin = 0.2, distance = distance, type_of_triplets = "hard")
+    triplet_criterion = losses.TripletMarginLoss(margin = hp.MARGIN, distance = distance, reducer = reducer)
+    triplet_mining = miners.TripletMarginMiner(margin = hp.MARGIN, distance = distance, type_of_triplets = "semihard")
 
     train_loss, val_loss = [], []
     start = time.time()
