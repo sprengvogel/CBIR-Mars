@@ -18,6 +18,10 @@ import pickle
 from pathlib import Path
 from pytorch_metric_learning import losses, miners, distances, reducers
 
+
+def removeclassdoublings(indices_tuple):
+    print(indices_tuple)
+    return indices_tuple
 # train the model
 def train(model, dataloader, train_dict):
     model.train()
@@ -36,8 +40,12 @@ def train(model, dataloader, train_dict):
 
         triplet_indices_tuple = triplet_mining(norm_embeddings, labels)
         triplet_loss = triplet_criterion(norm_embeddings, labels, triplet_indices_tuple)
-        #triplet_loss = torch.sum(triplet_loss["loss"]["losses"])
-        #print(triplet_indices_tuple)
+
+        if hp.INTERCLASSTRIPLETS == True:
+            interclass_labels = data[2]
+            inter_class_triplet_indices_tuple = triplet_mining(norm_embeddings, interclass_labels)
+            #inter_class_triplet_indices_tuple = removeclassdoublings(inter_class_triplet_indices_tuple)
+            triplet_loss += triplet_criterion(norm_embeddings, interclass_labels, inter_class_triplet_indices_tuple)
 
         hashing_loss = hashing_criterion(embeddings)
         #print("triplet loss: ", triplet_loss)
@@ -45,13 +53,7 @@ def train(model, dataloader, train_dict):
         loss = triplet_loss + hashing_loss
         #print("loss: ", loss)
 
-        '''if hp.INTERCLASSTRIPLETS == True:
-            ic_positive = torch.stack([train_dict[x] for x in data[3][0]])
-            ic_negative = torch.stack([train_dict[x] for x in data[4][0]])
-            ic_output_pos = model(ic_positive)
-            ic_output_neg = model(ic_negative)
 
-            loss += criterion(output_anchor, ic_output_pos, ic_output_neg)'''
         # backpropagation
         loss.backward()
         #plot_grad_flow(model.named_parameters())
@@ -59,6 +61,9 @@ def train(model, dataloader, train_dict):
         optimizer.step()
         # add loss of each item (total items in a batch = batch size)
         running_loss += loss.item()
+
+        #if bi == int(hp.EPOCHS*0.95):
+        #    triplet_mining.type_of_triplets = "hard"
     final_loss = running_loss / (len(ctx_train) / dataloader.batch_size)
 
     return final_loss
@@ -79,9 +84,13 @@ def validate(model, dataloader, val_dict, epoch):
 
             triplet_indices_tuple = triplet_mining(norm_embeddings, labels)
             triplet_loss = triplet_criterion(norm_embeddings, labels, triplet_indices_tuple)
-            #triplet_loss = torch.sum(triplet_loss["loss"]["losses"])
+            if hp.INTERCLASSTRIPLETS == True:
+                interclass_labels = data[2]
+                inter_class_triplet_indices_tuple = triplet_mining(norm_embeddings, interclass_labels)
+                triplet_loss += triplet_criterion(norm_embeddings, interclass_labels, inter_class_triplet_indices_tuple)
+
             hashing_loss = hashing_criterion(embeddings)
-            loss = triplet_loss + hashing_loss
+            loss = triplet_loss# + hashing_loss
 
             # add loss of each item (total items in a batch = batch size)
             running_loss += loss.item()
@@ -117,7 +126,7 @@ if __name__ == '__main__':
 
 
 
-    ctx_train = ImageFolderWithLabel(root="./data/train", transform=data_transform)
+    ctx_train = ImageFolderWithLabel(root="./data/train", transform=data_transform, interclasstriplets = hp.INTERCLASSTRIPLETS)
     train_loader = torch.utils.data.DataLoader(
         ctx_train,
         batch_size=hp.BATCH_SIZE,
@@ -126,7 +135,7 @@ if __name__ == '__main__':
         pin_memory=True,
     )
 
-    ctx_val = ImageFolderWithLabel(root="./data/val", transform=data_transform)
+    ctx_val = ImageFolderWithLabel(root="./data/val", transform=data_transform, interclasstriplets = hp.INTERCLASSTRIPLETS)
     val_loader = torch.utils.data.DataLoader(
         ctx_val,
         batch_size=hp.BATCH_SIZE,
