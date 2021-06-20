@@ -1,15 +1,10 @@
-from numpy import mod
 import torch
 import time
-from random import randrange
-from torch.nn.modules.container import ModuleList
 import torch.optim as optim
-import torch.nn as nn
-import torch.nn.functional as F
-from torch.utils.data import DataLoader, Dataset
+from torch.utils.data import DataLoader
 from tqdm import tqdm
-from torchvision import transforms, datasets
-from data import TripletDataset, MultiviewDataset
+from torchvision import transforms
+from data import MultiviewDataset
 from CBIRModel import CBIRModel
 import hparams as hp
 from loss import criterion
@@ -33,39 +28,52 @@ def computeE(view1, view2):
     Q[0, :, :] = view1
     Q[1, :, :] = view2
 
-    for m in range(hp.NUM_VIEWS):
-        result = 0
-        # c_index = np.argmax(Q[m, :, :], axis=1)
-        # c_max = np.amax(Q[m, :, :], axis=1)
-        # c_max_index = np.argmax(c_max)
-        V = []
-        V_sum = 0
-        for c in range(hp.NUM_CLASSES):
-            V.append(computeV(Q[m, :, c]))
-            V_sum = math.sqrt(computeV(Q[m, :, c]))
-        result += math.sqrt(max(V))
-        result -= V_sum / num_images
-        E.append(result)
+    for n in range(num_images):
+        En = []
+        for m in range(hp.NUM_VIEWS):
+            result = 0
+            # c_index = np.argmax(Q[m, :, :], axis=1)
+            # c_max = np.amax(Q[m, :, :], axis=1)
+            # c_max_index = np.argmax(c_max)
+            V = []
+            V_sum = 0
+            for c in range(hp.NUM_CLASSES):
+                # V.append(computeV(Q[m, :, c]))
+                # V_sum = math.sqrt(computeV(Q[m, :, c]))
+                V.append(computeV(Q[m, :, c]))
+                V_sum = math.sqrt(computeV(Q[m, :, c]))
+            result += math.sqrt(max(V))
+            result -= V_sum / num_images
+            En.append(result)
+        E.append(En)
 
     E = np.asarray(E)
-    for m in range(hp.NUM_VIEWS):
-        E[m] = math.log(E[m] + np.abs(np.min(E)) + 1) / math.log(np.max(np.abs(E)) + np.abs(np.min(E)) + 1)
+    for n in range(num_images):
+        for m in range(hp.NUM_VIEWS):
+            E[n][m] = math.log(E[n][m] + np.abs(np.min(E[n])) + 1) / math.log(np.max(np.abs(E[n])) + np.abs(np.min(E[n])) + 1)
     return E
 
 
-def computeL(B, labels):
-    # B1 = B[0::2]
-    # labels1 = labels[0::2]
-    # B2 = B[1::2]
-    # labels2 = labels[1::2]
+def computeLm(b1, b2, y):
+    a = 0.5
+    b1 = b1.detach().cpu().numpy()
+    b2 = b2.detach().cpu().numpy()
+    Lm = -(y-1) * np.max(a - np.linalg.norm(b1-b2), 0) \
+         + (y+1) * np.linalg.norm(b1-b2) \
+         + a * (np.linalg.norm(np.abs(b1)-1, ord=1) + np.linalg.norm(np.abs(b2)-1, ord=1))
+    return Lm
 
-    Y = np.zeros((len(B), len(B)))
-    for i in range(len(B)):
-        for j in range(len(B)):
-            if labels[i] == labels[j]:
-                Y[i][j] = 1
-            else:
-                Y[i][j] = -1
+def computeL(E, B1, B2, labels):
+    L = 0
+    B = [B1, B2]
+    for n in range(len(B1)):
+        for m in range(hp.NUM_VIEWS):
+            L += E[n][m]
+            for i in range(len(B1)):
+                y = -1
+                if labels[n] == labels[i]:
+                    y = 1
+                L += computeLm(B[m][n], B[m][i], y)
     return 0
 
 # train the model
@@ -87,7 +95,7 @@ def train(model, dataloader, densenet):
         output_view1 = model(dense_view1)
         output_view2 = model(dense_view2)
 
-        L1 = computeL(output_view1, labels)
+        L = computeL(E, output_view1, output_view2, labels)
 
         #model.train()
         loss = criterion(output_anchor, output_pos, output_neg)

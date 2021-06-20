@@ -9,7 +9,20 @@ from data import MultiviewDataset
 import hparams as hp
 import matplotlib.pyplot as plt
 from SimCLRModel import SimCLR
+from loss import criterion
+from LARS import LARS
 
+
+class AddGaussianNoise(object):
+    def __init__(self, mean=0., std=1.):
+        self.std = std
+        self.mean = mean
+
+    def __call__(self, tensor):
+        return tensor + torch.randn(tensor.size()) * self.std + self.mean
+
+    def __repr__(self):
+        return self.__class__.__name__ + '(mean={0}, std={1})'.format(self.mean, self.std)
 
 def contrastive_loss(z_i, z_j):
 
@@ -20,7 +33,6 @@ def contrastive_loss(z_i, z_j):
     temperature = 0.5
     out = torch.cat([z_i, z_j], dim=0)
     # [2*B, 2*B]
-    #sim_matrix = torch.exp(torch.mm(out, out.t().contiguous()) / temperature)
     sim_matrix = F.cosine_similarity(out.unsqueeze(1), out.unsqueeze(0), dim=2)
     mask = (torch.ones_like(sim_matrix) - torch.eye(2 * batch_size, device=sim_matrix.device)).bool()
 
@@ -32,6 +44,7 @@ def contrastive_loss(z_i, z_j):
     # [2*B]
     pos_sim = torch.cat([pos_sim, pos_sim], dim=0)
     loss = (- torch.log(pos_sim / sim_matrix.sum(dim=-1))).mean()
+
     return loss
 
 
@@ -60,7 +73,7 @@ def train(model, dataloader):
     return final_loss
 
 
-#validate model
+# validate model
 def validate(model, dataloader):
     model.eval()
     running_loss = 0.0
@@ -88,7 +101,7 @@ def plot_grad_flow(named_parameters):
             layers.append(n)
             ave_grads.append(p.grad.cpu().detach().abs().mean())
     plt.plot(ave_grads, alpha=0.3, color="b")
-    plt.hlines(0, 0, len(ave_grads)+1, linewidth=1, color="k" )
+    plt.hlines(0, 0, len(ave_grads)+1, linewidth=1, color="k")
     plt.xticks(range(0,len(ave_grads), 1), layers, rotation="vertical")
     plt.xlim(xmin=0, xmax=len(ave_grads))
     plt.xlabel("Layers")
@@ -99,15 +112,24 @@ def plot_grad_flow(named_parameters):
 
 if __name__ == '__main__':
 
+    train_transform = transforms.Compose([
+        transforms.RandomResizedCrop([224,224]),
+        transforms.RandomHorizontalFlip(p=0.5),
+        transforms.RandomRotation(degrees=90),
+        transforms.ToTensor(),
+        transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
+        transforms.RandomApply([AddGaussianNoise(1, 0.5)], 0.5)
+    ])
+
     data_transform = transforms.Compose(
         [
             transforms.Resize([224, 224]),
             transforms.ToTensor(),
-            transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
+            transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
         ]
     )
 
-    ctx_train = MultiviewDataset(root="./data/train", transform=data_transform)
+    ctx_train = MultiviewDataset(root="./data/trainorig", transform=train_transform)
     train_loader = torch.utils.data.DataLoader(
         ctx_train,
         batch_size=hp.BATCH_SIZE,
@@ -116,7 +138,7 @@ if __name__ == '__main__':
         pin_memory=True,
     )
 
-    ctx_val = MultiviewDataset(root="./data/val", transform=data_transform)
+    ctx_val = MultiviewDataset(root="./data/valorig", transform=train_transform)
     val_loader = torch.utils.data.DataLoader(
         ctx_val, batch_size=hp.BATCH_SIZE, shuffle=True, num_workers=8
     )
@@ -132,12 +154,12 @@ if __name__ == '__main__':
 
     # initialize the model
 
-    model = SimCLR(hp.HASH_BITS)
+    model = SimCLR(128)
     model.to(device)
 
     # define optimizer. Also initialize learning rate scheduler
-    optimizer = optim.Adam(model.parameters(), lr=hp.LR, betas=hp.ADAM_BETAS)
-
+    #optimizer = optim.Adam(model.parameters(), lr=hp.LR, betas=hp.ADAM_BETAS)
+    optimizer = LARS(model.parameters(), lr=0.1)
 
     train_loss, val_loss = [], []
     start = time.time()

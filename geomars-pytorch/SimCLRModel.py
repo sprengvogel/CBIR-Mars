@@ -9,7 +9,6 @@ import hparams as hp
 from torchvision import models
 
 
-
 def init_weights(m):
     if type(m) == nn.Linear:
         torch.nn.init.xavier_uniform(m.weight)
@@ -25,36 +24,44 @@ class SimCLR(nn.Module):
         super(SimCLR, self).__init__()
 
         # densenet
-        self.encoder = models.densenet121(pretrained=True)
-        # self.encoder = nn.Sequential(*list(densenet_orig.children())[:-1])
+        self.encoder = torch.hub.load('pytorch/vision:v0.6.0', 'densenet121', pretrained=True)
+        self.encoder = torch.nn.Sequential(*(list(self.encoder.children())[:-1]), nn.AvgPool2d(7))
         self.encoder.requires_grad_(False)
-        self.n_features = hp.DENSENET_NUM_FEATURES
+        self.encoder.eval()
+        #self.lin1 = nn.Linear(hp.DENSENET_NUM_FEATURES, 512)
 
-        # hashmodel
-        self.lin1 = nn.Linear(self.n_features, 500)
-        init_weights(self.lin1)
-        self.leakyrelu1 = nn.LeakyReLU(negative_slope=hp.MARGIN)
-        self.lin2 = nn.Linear(500, 250)
-        init_weights(self.lin2)
-        self.leakyrelu2 = nn.LeakyReLU(negative_slope=hp.MARGIN)
-        self.lin3 = nn.Linear(250, hp.HASH_BITS)
-        init_weights(self.lin3)
+        # # hashmodel
+        # self.lin1 = nn.Linear(hp.DENSENET_NUM_FEATURES, 500)
+        # init_weights(self.lin1)
+        # self.leakyrelu1 = nn.LeakyReLU(negative_slope=hp.MARGIN)
+        # self.lin2 = nn.Linear(500, 250)
+        # init_weights(self.lin2)
+        # self.leakyrelu2 = nn.LeakyReLU(negative_slope=hp.MARGIN)
+        # self.lin3 = nn.Linear(250, hp.HASH_BITS)
+        # init_weights(self.lin3)
 
-        # We use a MLP with one hidden layer to obtain z_i = g(h_i) = W(2)σ(W(1)h_i) where σ is a ReLU non-linearity.
+        #We use a MLP with one hidden layer to obtain z_i = g(h_i) = W(2)σ(W(1)h_i) where σ is a ReLU non-linearity.
         self.projector = nn.Sequential(
-            nn.Linear(hp.HASH_BITS, hp.HASH_BITS, bias=False),
+            nn.Linear(hp.DENSENET_NUM_FEATURES, hp.DENSENET_NUM_FEATURES, bias=False),
             nn.ReLU(),
-            nn.Linear(hp.HASH_BITS, projection_dim, bias=False),
+            nn.Linear(hp.DENSENET_NUM_FEATURES, projection_dim, bias=False),
         )
 
     def forward(self, x):
-        features = self.encoder(x)
 
-        seq = nn.Sequential(self.lin1, self.leakyrelu1, self.lin2, self.leakyrelu2, self.lin3)
+        # features = self.encoder(x).squeeze()
+        # seq = nn.Sequential(self.lin1, self.leakyrelu1, self.lin2, self.leakyrelu2, self.lin3)
+        #
+        # h = nn.Sigmoid()(seq(features))
+        #
+        # #z = self.projector(h)
+        #
+        #
+        # #return F.normalize(z, dim=1)
+        # return h
 
-        h = torch.tanh(seq(features))
-
+        h = self.encoder(x)
+        h = torch.flatten(h, start_dim=1)
         z = self.projector(h)
 
-        # Todo: -1 oder 1
         return F.normalize(z, dim=1)

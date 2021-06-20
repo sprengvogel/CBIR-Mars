@@ -129,7 +129,7 @@ if __name__ == '__main__':
     # initialize the model
 
     densenet = torch.hub.load('pytorch/vision:v0.6.0', 'densenet121', pretrained=True)
-    #densenet = nn.Sequential(*list(densenet.children())[:-1])
+    # densenet = nn.Sequential(*list(densenet.children())[:-1])
     densenet.to(device)
     densenet.requires_grad_(False)
     densenet.eval()
