@@ -19,9 +19,24 @@ from pathlib import Path
 from pytorch_metric_learning import losses, miners, distances, reducers
 
 
-def removeclassdoublings(indices_tuple):
-    print(indices_tuple)
-    return indices_tuple
+def removeclassdoublings(indices_tuple, labels):
+    indices_tuple = indices_tuple
+    indices_list = [[], [], []]
+
+    for i in range(int(indices_tuple[0].size()[0])):
+        class1 = labels[indices_tuple[0][i]]
+        class2 = labels[indices_tuple[1][i]]
+        class3 = labels[indices_tuple[2][i]]
+
+        if class1 == class2 and class1 == class3:
+            continue
+
+        indices_list[0].append(indices_tuple[0][i])
+        indices_list[1].append(indices_tuple[1][i])
+        indices_list[2].append(indices_tuple[2][i])
+
+    return ( torch.LongTensor(indices_list[0]), torch.LongTensor(indices_list[1]), torch.LongTensor(indices_list[2]) )
+
 # train the model
 def train(model, dataloader, train_dict):
     model.train()
@@ -44,7 +59,7 @@ def train(model, dataloader, train_dict):
         if hp.INTERCLASSTRIPLETS == True:
             interclass_labels = data[2]
             inter_class_triplet_indices_tuple = triplet_mining(norm_embeddings, interclass_labels)
-            #inter_class_triplet_indices_tuple = removeclassdoublings(inter_class_triplet_indices_tuple)
+            inter_class_triplet_indices_tuple = removeclassdoublings(inter_class_triplet_indices_tuple, labels)
             triplet_loss += triplet_criterion(norm_embeddings, interclass_labels, inter_class_triplet_indices_tuple)
 
         hashing_loss = hashing_criterion(embeddings)
@@ -87,6 +102,7 @@ def validate(model, dataloader, val_dict, epoch):
             if hp.INTERCLASSTRIPLETS == True:
                 interclass_labels = data[2]
                 inter_class_triplet_indices_tuple = triplet_mining(norm_embeddings, interclass_labels)
+                inter_class_triplet_indices_tuple = removeclassdoublings(inter_class_triplet_indices_tuple, labels)
                 triplet_loss += triplet_criterion(norm_embeddings, interclass_labels, inter_class_triplet_indices_tuple)
 
             hashing_loss = hashing_criterion(embeddings)

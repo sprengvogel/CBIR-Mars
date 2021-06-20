@@ -6,7 +6,7 @@ import torch.nn as nn
 from torch.utils.data import DataLoader, Dataset
 from tqdm import tqdm
 from torchvision import transforms, datasets
-from sklearn.cluster import KMeans#MiniBatchKMeans as KMeans
+from sklearn.cluster import KMeans #MiniBatchKMeans as KMeans
 import numpy as np
 import cv2
 
