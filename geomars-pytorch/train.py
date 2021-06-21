@@ -20,25 +20,15 @@ from pytorch_metric_learning import losses, miners, distances, reducers
 
 
 def removeclassdoublings(indices_tuple, labels):
-    indices_tuple = indices_tuple
-    indices_list = [[], [], []]
-    #print(int(indices_tuple[0].size()[0]))
 
-    (indices_tuple[0] == indices_tuple[1]).byte()
+    matches1 = (labels[indices_tuple[0]] == labels[indices_tuple[1]])
+    matches2 = (labels[indices_tuple[0]] == labels[indices_tuple[2]])
+    matches = ~(matches1 | matches2)
+    #print("binary: ", matches )
+    #print(indices_tuple[0].size())
+    #print(indices_tuple[0][matches].size())
 
-    for i in range(int(indices_tuple[0].size()[0])):
-        class1 = labels[indices_tuple[0][i]]
-        class2 = labels[indices_tuple[1][i]]
-        class3 = labels[indices_tuple[2][i]]
-
-        if class1 == class2 and class1 == class3:
-            continue
-
-        indices_list[0].append(indices_tuple[0][i])
-        indices_list[1].append(indices_tuple[1][i])
-        indices_list[2].append(indices_tuple[2][i])
-
-    return ( torch.LongTensor(indices_list[0]), torch.LongTensor(indices_list[1]), torch.LongTensor(indices_list[2]) )
+    return ( indices_tuple[0][matches], indices_tuple[1][matches], indices_tuple[2][matches])
 
 # train the model
 def train(model, dataloader, train_dict):
@@ -62,7 +52,7 @@ def train(model, dataloader, train_dict):
         if hp.INTERCLASSTRIPLETS == True:
             interclass_labels = data[2]
             inter_class_triplet_indices_tuple = triplet_mining(norm_embeddings, interclass_labels)
-            #inter_class_triplet_indices_tuple = removeclassdoublings(inter_class_triplet_indices_tuple, labels)
+            inter_class_triplet_indices_tuple = removeclassdoublings(inter_class_triplet_indices_tuple, labels)
             triplet_loss += triplet_criterion(norm_embeddings, interclass_labels, inter_class_triplet_indices_tuple)
 
         hashing_loss = hashing_criterion(embeddings)
@@ -109,7 +99,7 @@ def validate(model, dataloader, val_dict, epoch):
                 triplet_loss += triplet_criterion(norm_embeddings, interclass_labels, inter_class_triplet_indices_tuple)
 
             hashing_loss = hashing_criterion(embeddings)
-            loss = triplet_loss# + hashing_loss
+            loss = triplet_loss + hashing_loss
 
             # add loss of each item (total items in a batch = batch size)
             running_loss += loss.item()
@@ -250,6 +240,8 @@ if __name__ == '__main__':
             best_loss = val_epoch_loss
             print("Saved Model. Best Epoch: " + str(best_epoch+1))
             torch.save(model.state_dict(), 'outputs/model_best.pth')
+        print("Saved last Model.")
+        torch.save(model.state_dict(), 'outputs/model_last.pth')
         print(f"Train Loss: {train_epoch_loss}")
         print(f"Val Loss: {val_epoch_loss}")
         train_loss.append(train_epoch_loss)

@@ -38,7 +38,7 @@ if __name__ == '__main__':
     model.to(device)
 
     #Load state dict
-    state_dict_path = os.path.join(os.getcwd(), "outputs/model_best.pth")
+    state_dict_path = os.path.join(os.getcwd(), "outputs/model_last.pth")
 
     if torch.cuda.is_available():
         model.load_state_dict(torch.load(state_dict_path))
