@@ -6,7 +6,7 @@ import torch.nn as nn
 from torch.utils.data import DataLoader, Dataset
 from tqdm import tqdm
 from torchvision import transforms, datasets
-from sklearn.cluster import KMeans #MiniBatchKMeans as KMeans
+from sklearn.cluster import MiniBatchKMeans as KMeans
 import numpy as np
 import cv2
 
@@ -18,9 +18,10 @@ def getRandomNumber(start, end, exclude=None):
 
 class ImageFolderWithLabel(datasets.ImageFolder):
 
-    def __init__(self, root, transform, interclasstriplets=False):
+    def __init__(self, root, transform, interclasstriplets=False, n_clusters = None):
         super().__init__(root, transform)
         self.interclasstriplets = interclasstriplets
+        self.n_clusters = n_clusters
 
         if self.interclasstriplets:
             print("Generating dictionary to assign classes to img paths.")

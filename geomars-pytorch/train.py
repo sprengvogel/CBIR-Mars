@@ -22,6 +22,7 @@ from pytorch_metric_learning import losses, miners, distances, reducers
 def removeclassdoublings(indices_tuple, labels):
     indices_tuple = indices_tuple
     indices_list = [[], [], []]
+    #print(int(indices_tuple[0].size()[0]))
 
     for i in range(int(indices_tuple[0].size()[0])):
         class1 = labels[indices_tuple[0][i]]
@@ -59,7 +60,7 @@ def train(model, dataloader, train_dict):
         if hp.INTERCLASSTRIPLETS == True:
             interclass_labels = data[2]
             inter_class_triplet_indices_tuple = triplet_mining(norm_embeddings, interclass_labels)
-            inter_class_triplet_indices_tuple = removeclassdoublings(inter_class_triplet_indices_tuple, labels)
+            #inter_class_triplet_indices_tuple = removeclassdoublings(inter_class_triplet_indices_tuple, labels)
             triplet_loss += triplet_criterion(norm_embeddings, interclass_labels, inter_class_triplet_indices_tuple)
 
         hashing_loss = hashing_criterion(embeddings)
@@ -142,7 +143,7 @@ if __name__ == '__main__':
 
 
 
-    ctx_train = ImageFolderWithLabel(root="./data/train", transform=data_transform, interclasstriplets = hp.INTERCLASSTRIPLETS)
+    ctx_train = ImageFolderWithLabel(root="./data/train", transform=data_transform, interclasstriplets = hp.INTERCLASSTRIPLETS, n_clusters = hp.KMEANS_CLUSTERS)
     train_loader = torch.utils.data.DataLoader(
         ctx_train,
         batch_size=hp.BATCH_SIZE,
@@ -151,7 +152,7 @@ if __name__ == '__main__':
         pin_memory=True,
     )
 
-    ctx_val = ImageFolderWithLabel(root="./data/val", transform=data_transform, interclasstriplets = hp.INTERCLASSTRIPLETS)
+    ctx_val = ImageFolderWithLabel(root="./data/val", transform=data_transform, interclasstriplets = hp.INTERCLASSTRIPLETS, n_clusters = hp.KMEANS_CLUSTERS)
     val_loader = torch.utils.data.DataLoader(
         ctx_val,
         batch_size=hp.BATCH_SIZE,
