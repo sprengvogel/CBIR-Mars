@@ -14,7 +14,7 @@ from LARS import LARS
 
 
 class AddGaussianNoise(object):
-    def __init__(self, mean=0., std=1.):
+    def __init__(self, mean=0., std=1.):   
         self.std = std
         self.mean = mean
 
