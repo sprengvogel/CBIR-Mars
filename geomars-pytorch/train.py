@@ -24,6 +24,8 @@ def removeclassdoublings(indices_tuple, labels):
     indices_list = [[], [], []]
     #print(int(indices_tuple[0].size()[0]))
 
+    (indices_tuple[0] == indices_tuple[1]).byte()
+
     for i in range(int(indices_tuple[0].size()[0])):
         class1 = labels[indices_tuple[0][i]]
         class2 = labels[indices_tuple[1][i]]
