@@ -64,4 +64,4 @@ class SimCLR(nn.Module):
         h = torch.flatten(h, start_dim=1)
         z = self.projector(h)
 
-        return F.normalize(z, dim=1)
+        return F.normalize(z, dim=-1)
