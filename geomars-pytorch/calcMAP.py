@@ -54,7 +54,7 @@ if __name__ == '__main__':
     model.to(device)
 
     #Load state dict
-    state_dict_path = os.path.join(os.getcwd(), "outputs/model_best.pth")
+    state_dict_path = os.path.join(os.getcwd(), "outputs/model_last.pth")
 
     if torch.cuda.is_available():
         model.load_state_dict(torch.load(state_dict_path))
@@ -93,7 +93,7 @@ if __name__ == '__main__':
             output = output.cpu().detach().numpy()
             hashCode = np.empty(hp.HASH_BITS).astype(np.int8)
             hashCode = ((np.sign(output -0.5)+1)/2)
-            
+
             query = hashCode
             matches_list = []
             label_list = []
