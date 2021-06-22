@@ -17,6 +17,7 @@ import matplotlib.pyplot as plt
 import pickle
 from pathlib import Path
 from pytorch_metric_learning import losses, miners, distances, reducers
+from whitening import WTransform2d, EntropyLoss
 
 
 def removeclassdoublings(indices_tuple, labels):
@@ -35,15 +36,23 @@ def train(model, dataloader, train_dict):
     model.train()
     running_loss = 0.0
     for bi, data in tqdm(enumerate(dataloader), total=int(len(ctx_train) / dataloader.batch_size)):
-        inputs = torch.stack([train_dict[x] for x in data[0]])
+        source_inputs = torch.stack([train_dict[x] for x in data[0]])
+        target_inputs = source_inputs
         labels = data[1]
 
         # zero grad the optimizer
         optimizer.zero_grad()
-        embeddings = model(inputs)
+
+        print(source_inputs.size())
+
+        source_inputs_whitend = source_whitening(source_inputs)
+        target_inputs_whitend = target_whitening(target_inputs)
+
+        source_embeddings = model(source_inputs_whitend)
+        target_embeddings = model(target_inputs_whitend)
         #print("labels: ", labels)
         #print(embeddings)
-        norm_embeddings = F.normalize(embeddings, p=2, dim=1)
+        norm_embeddings = F.normalize(source_embeddings, p=2, dim=1)
         #print(norm_embeddings)
 
         triplet_indices_tuple = triplet_mining(norm_embeddings, labels)
@@ -55,9 +64,10 @@ def train(model, dataloader, train_dict):
             inter_class_triplet_indices_tuple = removeclassdoublings(inter_class_triplet_indices_tuple, labels)
             triplet_loss += triplet_criterion(norm_embeddings, interclass_labels, inter_class_triplet_indices_tuple)
 
-        hashing_loss = hashing_criterion(embeddings)
+        hashing_loss = hashing_criterion(source_embeddings)
         #print("triplet loss: ", triplet_loss)
         #print("hash loss: ", hashing_loss)
+        entropy_loss = entropy_criterion(target_embeddings)
         loss = triplet_loss + hashing_loss
         #print("loss: ", loss)
 
@@ -213,6 +223,12 @@ if __name__ == '__main__':
         pickle.dump(val_dict, open("val.p", "wb"))
 
     # initialize the model
+    source_whitening = WTransform2d(num_features=hp.DENSENET_NUM_FEATURES, group_size=hp.DENSENET_NUM_FEATURES//16)
+    target_whitening = WTransform2d(num_features=hp.DENSENET_NUM_FEATURES, group_size=hp.DENSENET_NUM_FEATURES//16)
+    source_whitening.to(device)
+    target_whitening.to(device)
+    entropy_criterion = EntropyLoss()
+
     model = CBIRModel(useEncoder=False)
     model.to(device)
 

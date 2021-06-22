@@ -6,7 +6,7 @@ import torch.nn as nn
 from torch.utils.data import DataLoader, Dataset
 from tqdm import tqdm
 from torchvision import transforms, datasets
-from sklearn.cluster import KMeans
+from sklearn.cluster import MiniBatchKMeans as KMeans
 import numpy as np
 import cv2
 
@@ -67,11 +67,11 @@ class ImageFolderWithLabel(datasets.ImageFolder):
         sample_path = sample[0]
         sample_label = sample[1]
 
-        interclass_label = None
         if self.interclasstriplets:
             interclass_label = self.kmeans_labels[index]
+            return (sample_path, sample_label, interclass_label)
 
-        return (sample_path, sample_label, interclass_label)
+        return (sample_path, sample_label)
 
     def __len__(self):
         return len(self.samples)
