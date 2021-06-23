@@ -9,7 +9,7 @@ import torch.nn.functional as F
 from torch.utils.data import DataLoader, Dataset
 from tqdm import tqdm
 from torchvision import transforms, datasets
-from data import TripletDataset, InterClassTripletDataset, ImageFolderWithLabel
+from data import removeclassdoublings, ImageFolderWithLabel
 from CBIRModel import CBIRModel
 import hparams as hp
 from loss import criterion as hashing_criterion
@@ -17,19 +17,7 @@ import matplotlib.pyplot as plt
 import pickle
 from pathlib import Path
 from pytorch_metric_learning import losses, miners, distances, reducers
-from whitening import WTransform2d, EntropyLoss
-
-
-def removeclassdoublings(indices_tuple, labels):
-
-    matches1 = (labels[indices_tuple[0]] == labels[indices_tuple[1]])
-    matches2 = (labels[indices_tuple[0]] == labels[indices_tuple[2]])
-    matches = ~(matches1 | matches2)
-    #print("binary: ", matches )
-    #print(indices_tuple[0].size())
-    #print(indices_tuple[0][matches].size())
-
-    return ( indices_tuple[0][matches], indices_tuple[1][matches], indices_tuple[2][matches])
+from whitening import WTransform1D, EntropyLoss
 
 # train the model
 def train(model, dataloader, train_dict):
@@ -223,8 +211,8 @@ if __name__ == '__main__':
         pickle.dump(val_dict, open("val.p", "wb"))
 
     # initialize the model
-    source_whitening = WTransform2d(num_features=hp.DENSENET_NUM_FEATURES, group_size=hp.DENSENET_NUM_FEATURES//16)
-    target_whitening = WTransform2d(num_features=hp.DENSENET_NUM_FEATURES, group_size=hp.DENSENET_NUM_FEATURES//16)
+    source_whitening = WTransform1D(num_features=hp.DENSENET_NUM_FEATURES, group_size=hp.DENSENET_NUM_FEATURES//16)
+    target_whitening = WTransform1D(num_features=hp.DENSENET_NUM_FEATURES, group_size=hp.DENSENET_NUM_FEATURES//16)
     source_whitening.to(device)
     target_whitening.to(device)
     entropy_criterion = EntropyLoss()

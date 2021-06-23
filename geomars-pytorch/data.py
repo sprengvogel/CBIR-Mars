@@ -10,6 +10,14 @@ from sklearn.cluster import MiniBatchKMeans as KMeans
 import numpy as np
 import cv2
 
+def removeclassdoublings(indices_tuple, labels):
+
+    matches1 = (labels[indices_tuple[0]] == labels[indices_tuple[1]])
+    matches2 = (labels[indices_tuple[0]] == labels[indices_tuple[2]])
+    matches = ~(matches1 | matches2)
+
+    return ( indices_tuple[0][matches], indices_tuple[1][matches], indices_tuple[2][matches])
+
 def getRandomNumber(start, end, exclude=None):
     number_range = list(range(start, end))
     if exclude is not None:
@@ -76,7 +84,7 @@ class ImageFolderWithLabel(datasets.ImageFolder):
     def __len__(self):
         return len(self.samples)
 
-
+'''
 class TripletDataset(datasets.ImageFolder):
 
     def __init__(self, root, transform, test_mode = False):
@@ -217,3 +225,4 @@ class InterClassTripletDataset(TripletDataset):
             ic_negative = self.transform(ic_negative)
 
         return (anchor_path, anchor), (positive_path, positive), (negative_path, negative), (ic_positive_path, ic_positive), (ic_negative_path, ic_negative_path)
+'''
