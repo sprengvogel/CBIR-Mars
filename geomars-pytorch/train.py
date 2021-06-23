@@ -9,7 +9,7 @@ import torch.nn.functional as F
 from torch.utils.data import DataLoader, Dataset
 from tqdm import tqdm
 from torchvision import transforms, datasets
-from data import TripletDataset, InterClassTripletDataset, ImageFolderWithLabel
+from data import ImageFolderWithLabel, removeclassdoublings
 from CBIRModel import CBIRModel
 import hparams as hp
 from loss import criterion as hashing_criterion
@@ -17,18 +17,6 @@ import matplotlib.pyplot as plt
 import pickle
 from pathlib import Path
 from pytorch_metric_learning import losses, miners, distances, reducers
-
-
-def removeclassdoublings(indices_tuple, labels):
-
-    matches1 = (labels[indices_tuple[0]] == labels[indices_tuple[1]])
-    matches2 = (labels[indices_tuple[0]] == labels[indices_tuple[2]])
-    matches = ~(matches1 | matches2)
-    #print("binary: ", matches )
-    #print(indices_tuple[0].size())
-    #print(indices_tuple[0][matches].size())
-
-    return ( indices_tuple[0][matches], indices_tuple[1][matches], indices_tuple[2][matches])
 
 # train the model
 def train(model, dataloader, train_dict):
@@ -49,7 +37,7 @@ def train(model, dataloader, train_dict):
         triplet_indices_tuple = triplet_mining(norm_embeddings, labels)
         triplet_loss = triplet_criterion(norm_embeddings, labels, triplet_indices_tuple)
 
-        if hp.INTERCLASSTRIPLETS == True:
+        if hp.INTERCLASSTRIPLETS:
             interclass_labels = data[2]
             inter_class_triplet_indices_tuple = triplet_mining(norm_embeddings, interclass_labels)
             inter_class_triplet_indices_tuple = removeclassdoublings(inter_class_triplet_indices_tuple, labels)
@@ -92,7 +80,7 @@ def validate(model, dataloader, val_dict, epoch):
 
             triplet_indices_tuple = triplet_mining(norm_embeddings, labels)
             triplet_loss = triplet_criterion(norm_embeddings, labels, triplet_indices_tuple)
-            if hp.INTERCLASSTRIPLETS == True:
+            if hp.INTERCLASSTRIPLETS:
                 interclass_labels = data[2]
                 inter_class_triplet_indices_tuple = triplet_mining(norm_embeddings, interclass_labels)
                 inter_class_triplet_indices_tuple = removeclassdoublings(inter_class_triplet_indices_tuple, labels)

@@ -10,6 +10,15 @@ from sklearn.cluster import KMeans
 import numpy as np
 import cv2
 
+def removeclassdoublings(indices_tuple, labels):
+
+    matches1 = (labels[indices_tuple[0]] == labels[indices_tuple[1]])
+    matches2 = (labels[indices_tuple[0]] == labels[indices_tuple[2]])
+    matches = ~(matches1 | matches2)
+
+    return ( indices_tuple[0][matches], indices_tuple[1][matches], indices_tuple[2][matches])
+
+
 def getRandomNumber(start, end, exclude=None):
     number_range = list(range(start, end))
     if exclude is not None:
@@ -67,11 +76,11 @@ class ImageFolderWithLabel(datasets.ImageFolder):
         sample_path = sample[0]
         sample_label = sample[1]
 
-        interclass_label = None
         if self.interclasstriplets:
             interclass_label = self.kmeans_labels[index]
+            return (sample_path, sample_label, interclass_label)
 
-        return (sample_path, sample_label, interclass_label)
+        return (sample_path, sample_label)
 
     def __len__(self):
         return len(self.samples)
