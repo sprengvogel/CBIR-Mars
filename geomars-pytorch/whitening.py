@@ -6,7 +6,7 @@ More details on the implementation are described in their paper: https://arxiv.o
 
 import torch
 import torch.nn as nn
-from torch.nn.functional import conv2d, conv1d
+from torch.nn.functional import conv2d, conv1d, softmax, log_softmax
 
 class EntropyLoss(nn.Module):
 		''' Module to compute entropy loss '''
@@ -14,8 +14,8 @@ class EntropyLoss(nn.Module):
 				super(EntropyLoss, self).__init__()
 
 		def forward(self, x):
-				p = F.softmax(x, dim=1)
-				q = F.log_softmax(x, dim=1)
+				p = softmax(x, dim=1)
+				q = log_softmax(x, dim=1)
 				b = p * q
 				b = -1.0 * b.sum(-1).mean()
 				#b = -1.0 * b.sum()
@@ -128,29 +128,25 @@ class WTransform1D(_Whitening):
 		self._check_input_dim(x)
 		self._check_group_size()
 
-		print("input: ", x.size())
 		m = x.mean(0).view(self.num_features, -1).mean(-1).view(1, -1)
 		if not self.training and self.track_running_stats: # for inference
 			m = self.running_mean
 		xn = x - m
 
-		print("m: ", m.size())
-		print("xn: ", xn.size())
 
-		T = xn.contiguous().view(-1,self.num_groups, self.group_size)
+		T = xn.permute(1,0).contiguous().view(self.num_groups, self.group_size,-1)
 
-		print("T: ", T.size())
 		f_cov = torch.bmm(T, T.permute(0,2,1)) / T.shape[-1]
-		print("f_cov: ", f_cov.size())
 		f_cov_shrinked = (1-self.eps) * f_cov + self.eps * torch.eye(self.group_size, out=torch.cuda.FloatTensor() if torch.cuda.is_available() else torch.FloatTensor()).repeat(self.num_groups, 1, 1)
-		print("f_cov_shrinked: ", f_cov_shrinked.size())
+
 		if not self.training and self.track_running_stats: # for inference
 			f_cov_shrinked = (1-self.eps) * self.running_variance + self.eps * torch.eye(self.group_size, out=torch.cuda.FloatTensor() if torch.cuda.is_available() else torch.FloatTensor()).repeat(self.num_groups, 1, 1)
 
 		inv_sqrt = torch.inverse(torch.cholesky(f_cov_shrinked)).contiguous().view(self.num_features, self.group_size, 1)
-		print("inv_sqrt: ", inv_sqrt.size())
-		decorrelated = conv2d(xn, inv_sqrt, groups = self.num_groups)
-		print("decorrelated: ", decorrelated.size())
+
+		decorrelated = conv1d(xn.view(-1, self.num_features, 1), inv_sqrt, groups = self.num_groups)
+		decorrelated = decorrelated.view(-1, self.num_features)
+
 		if self.training and self.track_running_stats:
 			self.running_mean = torch.add(self.momentum * m.detach(), (1 - self.momentum) * self.running_mean, out=self.running_mean)
 			self.running_variance = torch.add(self.momentum * f_cov.detach(), (1 - self.momentum) * self.running_variance, out=self.running_variance)

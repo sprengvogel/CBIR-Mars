@@ -1,7 +1,7 @@
 from numpy import mod
 import torch
 import time
-from random import randrange
+from random import randrange, sample
 from torch.nn.modules.container import ModuleList
 import torch.optim as optim
 import torch.nn as nn
@@ -24,24 +24,16 @@ def train(model, dataloader, train_dict):
     model.train()
     running_loss = 0.0
     for bi, data in tqdm(enumerate(dataloader), total=int(len(ctx_train) / dataloader.batch_size)):
-        source_inputs = torch.stack([train_dict[x] for x in data[0]])
-        target_inputs = source_inputs
+        inputs = torch.stack([train_dict[x] for x in data[0]])
         labels = data[1]
 
         # zero grad the optimizer
         optimizer.zero_grad()
+        if hp.DOMAIN_ADAPTION:
+            inputs = source_whitening(inputs)
 
-        print(source_inputs.size())
-
-        source_inputs_whitend = source_whitening(source_inputs)
-        target_inputs_whitend = target_whitening(target_inputs)
-
-        source_embeddings = model(source_inputs_whitend)
-        target_embeddings = model(target_inputs_whitend)
-        #print("labels: ", labels)
-        #print(embeddings)
-        norm_embeddings = F.normalize(source_embeddings, p=2, dim=1)
-        #print(norm_embeddings)
+        embeddings = model(inputs)
+        norm_embeddings = F.normalize(embeddings, p=2, dim=1)
 
         triplet_indices_tuple = triplet_mining(norm_embeddings, labels)
         triplet_loss = triplet_criterion(norm_embeddings, labels, triplet_indices_tuple)
@@ -52,11 +44,20 @@ def train(model, dataloader, train_dict):
             inter_class_triplet_indices_tuple = removeclassdoublings(inter_class_triplet_indices_tuple, labels)
             triplet_loss += triplet_criterion(norm_embeddings, interclass_labels, inter_class_triplet_indices_tuple)
 
-        hashing_loss = hashing_criterion(source_embeddings)
+        hashing_loss = hashing_criterion(embeddings)
+
         #print("triplet loss: ", triplet_loss)
         #print("hash loss: ", hashing_loss)
-        entropy_loss = entropy_criterion(target_embeddings)
+
         loss = triplet_loss + hashing_loss
+
+        if hp.DOMAIN_ADAPTION:
+            target_inputs = torch.stack(sample(target_list, len(data[0])))
+            target_inputs = target_whitening(target_inputs)
+            target_embeddings = model(target_inputs)
+            entropy_loss = entropy_criterion(target_embeddings)
+            loss += entropy_loss
+
         #print("loss: ", loss)
 
 
@@ -84,6 +85,9 @@ def validate(model, dataloader, val_dict, epoch):
             inputs = torch.stack([val_dict[x] for x in data[0]])
             labels = data[1]
 
+            if hp.DOMAIN_ADAPTION:
+                inputs = target_whitening(inputs)
+
             embeddings = model(inputs)
 
             norm_embeddings = F.normalize(embeddings, p=2, dim=1)
@@ -98,6 +102,10 @@ def validate(model, dataloader, val_dict, epoch):
 
             hashing_loss = hashing_criterion(embeddings)
             loss = triplet_loss + hashing_loss
+
+            if hp.DOMAIN_ADAPTION:
+                entropy_loss = entropy_criterion(embeddings)
+                loss += entropy_loss
 
             # add loss of each item (total items in a batch = batch size)
             running_loss += loss.item()
@@ -131,8 +139,6 @@ if __name__ == '__main__':
         ]
     )
 
-
-
     ctx_train = ImageFolderWithLabel(root="./data/train", transform=data_transform, interclasstriplets = hp.INTERCLASSTRIPLETS, n_clusters = hp.KMEANS_CLUSTERS)
     train_loader = torch.utils.data.DataLoader(
         ctx_train,
@@ -147,7 +153,7 @@ if __name__ == '__main__':
         ctx_val,
         batch_size=hp.BATCH_SIZE,
         shuffle=True,
-        num_workers=8
+        num_workers=4
     )
 
     ctx_test = ImageFolderWithLabel(root="./data/test", transform=data_transform)
@@ -179,11 +185,13 @@ if __name__ == '__main__':
         num_workers=4,
         pin_memory=True,
     )
+
     encoder = torch.hub.load('pytorch/vision:v0.6.0', 'densenet121', pretrained=True)
     encoder = torch.nn.Sequential(*(list(encoder.children())[:-1]), nn.AvgPool2d(7))
     encoder.requires_grad_(False)
     encoder.eval()
     encoder.to(device)
+
     train_file_path = Path("./train.p")
     if train_file_path.is_file():
         train_dict = pickle.load(open("train.p","rb"))
@@ -210,13 +218,35 @@ if __name__ == '__main__':
             val_dict[sample_fname] = output
         pickle.dump(val_dict, open("val.p", "wb"))
 
-    # initialize the model
-    source_whitening = WTransform1D(num_features=hp.DENSENET_NUM_FEATURES, group_size=hp.DENSENET_NUM_FEATURES//16)
-    target_whitening = WTransform1D(num_features=hp.DENSENET_NUM_FEATURES, group_size=hp.DENSENET_NUM_FEATURES//16)
-    source_whitening.to(device)
-    target_whitening.to(device)
-    entropy_criterion = EntropyLoss()
+    if hp.DOMAIN_ADAPTION:
+        ctx_target_densenet = datasets.ImageFolder(root="./data/database", transform=data_transform)
+        target_loader_densenet = torch.utils.data.DataLoader(
+            ctx_target_densenet,
+            batch_size=1,
+            shuffle=False,
+            num_workers=4,
+            pin_memory=True,
+        )
+        target_file_path = Path("./database.p")
+        if target_file_path.is_file():
+            target_list = pickle.load(open("database.p","rb"))
+        else:
+            target_list= []
+            for bi, data in tqdm(enumerate(target_loader_densenet), total=int(len(ctx_target_densenet) / target_loader_densenet.batch_size)):
+                image_data, _ = data
+                sample_fname, _ = target_loader_densenet.dataset.samples[bi]
+                image_data = image_data.to(device)
+                output = encoder(image_data).squeeze().detach().clone()
+                target_list.append(output)
+            pickle.dump(target_list, open("database.p", "wb"))
 
+        source_whitening = WTransform1D(num_features=hp.DENSENET_NUM_FEATURES, group_size=hp.DENSENET_NUM_FEATURES//16)
+        target_whitening = WTransform1D(num_features=hp.DENSENET_NUM_FEATURES, group_size=hp.DENSENET_NUM_FEATURES//16)
+        source_whitening.to(device)
+        target_whitening.to(device)
+        entropy_criterion = EntropyLoss()
+
+    # initialize the model
     model = CBIRModel(useEncoder=False)
     model.to(device)
 
@@ -246,6 +276,8 @@ if __name__ == '__main__':
             torch.save(model.state_dict(), 'outputs/model_best.pth')
         print("Saved last Model.")
         torch.save(model.state_dict(), 'outputs/model_last.pth')
+        if hp.DOMAIN_ADAPTION:
+            torch.save(target_whitening.state_dict(), 'outputs/target_transform.pth')
         print(f"Train Loss: {train_epoch_loss}")
         print(f"Val Loss: {val_epoch_loss}")
         train_loss.append(train_epoch_loss)
