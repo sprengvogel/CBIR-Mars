@@ -137,7 +137,7 @@ if __name__ == '__main__':
         ctx_val,
         batch_size=hp.BATCH_SIZE,
         shuffle=True,
-        num_workers=8
+        num_workers=4
     )
 
     ctx_test = ImageFolderWithLabel(root="./data/test", transform=data_transform)
