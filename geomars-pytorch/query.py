@@ -38,7 +38,7 @@ if __name__ == '__main__':
     model.to(device)
 
     #Load state dict
-    state_dict_path = os.path.join(os.getcwd(), "outputs/model_best.pth")
+    state_dict_path = os.path.join(os.getcwd(), "outputs/model_last.pth")
 
     if torch.cuda.is_available():
         model.load_state_dict(torch.load(state_dict_path))
@@ -75,7 +75,7 @@ if __name__ == '__main__':
 
         feature_dict = pickle.load(open("feature_db.p", "rb"))
         query = hashCode
-        #print(hashCode)
+        print(hashCode)
         matches_list = []
         for key in feature_dict.keys():
             #print(np.array(feature_dict[key]))
@@ -87,6 +87,7 @@ if __name__ == '__main__':
     images = []
     for match in matches_list[:64]:
         image = Image.open(match[0])
+        print(match[0] ,np.array(feature_dict[match[0]][0]), match[1])
         images.append(image)
     grid = image_grid(images, 8, 8)
     grid.show()

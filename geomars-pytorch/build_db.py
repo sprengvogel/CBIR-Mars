@@ -16,9 +16,6 @@ import numpy as np
 
 if __name__ == '__main__':
 
-    #Change current working directory to source file location
-    os.chdir(os.path.dirname(__file__))
-
     # define device
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     print('Computation device: ', device)
@@ -28,7 +25,7 @@ if __name__ == '__main__':
     model.to(device)
 
     #Load state dict
-    state_dict_path = os.path.join(os.getcwd(), "outputs/model_best.pth")
+    state_dict_path = os.path.join(os.getcwd(), "outputs/model_last.pth")
     if torch.cuda.is_available():
         model.load_state_dict(torch.load(state_dict_path))
     else:
