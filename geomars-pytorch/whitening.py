@@ -107,13 +107,8 @@ class WTransform1D(_Whitening):
 			self.register_buffer('running_mean', self.running_m)
 			self.register_buffer('running_variance', self.running_var)
 		else:
-			self.register_buffer('running_mean', torch.zeros([1, self.num_features, 1, 1], out=torch.cuda.FloatTensor() if torch.cuda.is_available() else torch.FloatTensor()))
+			self.register_buffer('running_mean', torch.zeros([1, self.num_features], out=torch.cuda.FloatTensor() if torch.cuda.is_available() else torch.FloatTensor()))
 			self.register_buffer('running_variance', torch.ones([self.num_groups, self.group_size, self.group_size], out=torch.cuda.FloatTensor() if torch.cuda.is_available() else torch.FloatTensor()))
-		"""
-		if self.track_running_stats:
-			self.register_buffer('running_mean', torch.zeros([1, self.num_features, 1, 1], out=torch.cuda.FloatTensor() if torch.cuda.is_available() else torch.FloatTensor()))
-			self.register_buffer('running_variance', torch.zeros([self.num_groups, self.group_size, self.group_size], out=torch.cuda.FloatTensor() if torch.cuda.is_available() else torch.FloatTensor()))
-		"""
 
 	def _check_input_dim(self, input):
 		if input.dim() != 2:
@@ -125,6 +120,8 @@ class WTransform1D(_Whitening):
 				for {} number of features'.format(self.group_size, self.num_features))
 
 	def forward(self, x):
+		if x.dim() == 1:
+			x = x.view(1, -1)
 		self._check_input_dim(x)
 		self._check_group_size()
 
