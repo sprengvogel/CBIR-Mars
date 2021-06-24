@@ -98,13 +98,16 @@ if __name__ == '__main__':
             matches_list = []
             label_list = []
             sample_fname, _ = db_loader.dataset.samples[bi]
-            for key in feature_dict.keys():
+            for i, key in enumerate(feature_dict.keys()):
                 label = feature_dict[key][1]
                 dist = hamming(query, np.array(feature_dict[key][0]))
                 matches_list.append( (key, dist))
                 label_list.append(label)
+
             #Sort matches by distance and sort labels in the same way
             matches_list, label_list = (list(t) for t in zip(*sorted(zip(matches_list,label_list), key= lambda x : x[0][1])))
+            matches_list = matches_list[:64]
+            label_list = label_list[:64]
             average_precision = getAP(image_label, label_list)
             mAP += average_precision
     mAP /= int(len(ctx_test))

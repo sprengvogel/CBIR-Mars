@@ -17,6 +17,7 @@ import matplotlib.pyplot as plt
 import pickle
 from pathlib import Path
 from pytorch_metric_learning import losses, miners, distances, reducers
+import os
 
 # train the model
 def train(model, dataloader, train_dict):
@@ -169,11 +170,23 @@ if __name__ == '__main__':
         num_workers=4,
         pin_memory=True,
     )
-    encoder = torch.hub.load('pytorch/vision:v0.6.0', 'densenet121', pretrained=True)
-    encoder = torch.nn.Sequential(*(list(encoder.children())[:-1]), nn.AvgPool2d(7))
+
+    if hp.USE_IMAGENET:
+        encoder = torch.hub.load('pytorch/vision:v0.6.0', 'densenet121', pretrained=True)
+        encoder = torch.nn.Sequential(*(list(encoder.children())[:-1]), nn.AvgPool2d(7))
+    else:
+        encoder = torch.hub.load('pytorch/vision:v0.6.0', 'densenet121', pretrained=False)
+        num_ftrs = encoder.classifier.in_features
+        encoder.classifier = nn.Linear(num_ftrs, 15)
+        state_dict_path = os.path.join(os.getcwd(), "outputs/densenet121_pytorch_adapted.pth")
+        encoder.load_state_dict(torch.load(state_dict_path))
+        encoder = torch.nn.Sequential(*(list(encoder.children())[:-1]), nn.AvgPool2d(7))
+
+
     encoder.requires_grad_(False)
     encoder.eval()
     encoder.to(device)
+
     train_file_path = Path("./train.p")
     if train_file_path.is_file():
         train_dict = pickle.load(open("train.p","rb"))

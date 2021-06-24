@@ -2,6 +2,7 @@ from torch import nn
 import torch.nn.functional as F
 import torch
 import hparams as hp
+import os
 
 def init_weights(m):
     if type(m) == nn.Linear:
@@ -12,8 +13,16 @@ class CBIRModel(nn.Module):
     def __init__(self, useEncoder=True):
         super(CBIRModel, self).__init__()
         self.useEncoder = useEncoder
-        self.encoder = torch.hub.load('pytorch/vision:v0.6.0', 'densenet121', pretrained=True)
-        self.encoder = torch.nn.Sequential(*(list(self.encoder.children())[:-1]), nn.AvgPool2d(7))
+        if hp.USE_IMAGENET:
+            self.encoder = torch.hub.load('pytorch/vision:v0.6.0', 'densenet121', pretrained=True)
+            self.encoder = torch.nn.Sequential(*(list(self.encoder.children())[:-1]), nn.AvgPool2d(7))
+        else:
+            self.encoder = torch.hub.load('pytorch/vision:v0.6.0', 'densenet121', pretrained=False)
+            num_ftrs = self.encoder.classifier.in_features
+            self.encoder.classifier = nn.Linear(num_ftrs, 15)
+            state_dict_path = os.path.join(os.getcwd(), "outputs/densenet121_pytorch_adapted.pth")
+            self.encoder.load_state_dict(torch.load(state_dict_path))
+            self.encoder = torch.nn.Sequential(*(list(self.encoder.children())[:-1]), nn.AvgPool2d(7))
         self.encoder.requires_grad_(False)
         self.encoder.eval()
         self.lin1 = nn.Linear(hp.DENSENET_NUM_FEATURES, 512)
@@ -31,8 +40,8 @@ class CBIRModel(nn.Module):
             encoded_features = self.encoder(x).squeeze()
             output = seq(encoded_features)
         else:
-            output = seq(x)         
-        
+            output = seq(x)
+
         #print(nn.Sigmoid()(output).shape)
         #print(nn.Sigmoid()(output))
         #print(F.normalize(nn.Sigmoid()(output),1).shape)
