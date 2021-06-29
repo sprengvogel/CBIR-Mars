@@ -34,7 +34,7 @@ if __name__ == '__main__':
     print('Computation device: ', device)
 
     # initialize the model
-    model = CBIRModel()
+    model = CBIRModel(useProjector=False)
     model.to(device)
 
     #Load state dict

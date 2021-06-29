@@ -10,3 +10,7 @@ densenet121.pth
 feature_db.json
 feature_db_pretrained_densenet121.json
 feature_db.p
+train_view1.p
+train_view2.p
+val_view1.p 
+val_view2.p

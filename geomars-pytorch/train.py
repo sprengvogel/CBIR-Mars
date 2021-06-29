@@ -57,30 +57,31 @@ def contrastive_loss(z_i, z_j):
 
 
 # train the model
-def train(model, dataloader, train_dict_view1, train_dict_view2):
+def train(model, dataloader, train_dict, train_dict_view2):
     model.train()
     running_loss = 0.0
     for bi, data in tqdm(enumerate(dataloader), total=int(len(ctx_train) / dataloader.batch_size)):
-        #inputs = torch.stack([train_dict[x] for x in data[0]])
+        cont_loss = 0
+        if hp.MULTIVIEWS:
+            orig = torch.stack([train_dict[x] for x in data[0]])
+            view2 = torch.stack([train_dict_view2[x] for x in data[0]])
+            optimizer.zero_grad()
+            embeddings_orig, z_i = model(orig)
+            embeddings_view2, z_j = model(view2)
+            cont_loss = contrastive_loss(z_i, z_j)
+        else:
+            orig = torch.stack([train_dict[x] for x in data[0]])
+            optimizer.zero_grad()
+            embeddings_orig = model(orig)
         labels = data[1]
-        orig = torch.stack([train_dict_view1[x] for x in data[0]])
-        view2 = torch.stack([train_dict_view2[x] for x in data[0]])
-        # inputs = torch.cat([view1, view2])
-        # label_range = torch.arange(0, len(data[0]))
-        # labels = torch.cat([label_range, label_range])
 
-        #grid_img = torchvision.utils.make_grid(orig[:25], nrow=5)
-        #torchvision.utils.save_image(grid_img, "images/batch" + str(epoch) + str(bi) + ".jpg")
-        #plt.imsave("images/batch" + str(epoch) + str(bi) + ".jpg", grid_img.permute(1, 2, 0).cpu().numpy())
+
         # zero grad the optimizer
-        optimizer.zero_grad()
-        embeddings_orig, z_i = model(orig)
-        embeddings_view2, z_j = model(view2)
-        #print("labels: ", labels)
-        #print(embeddings)
+        # optimizer.zero_grad()
+        #embeddings_orig, z_i = model(orig)
+        # embeddings_view2, z_j = model(view2)
         norm_embeddings_orig = F.normalize(embeddings_orig, p=2, dim=1)
-        norm_embeddings_view2 = F.normalize(embeddings_view2, p=2, dim=1)
-        #print(norm_embeddings)
+
         triplet_indices_tuple = triplet_mining(norm_embeddings_orig, labels)
         triplet_loss = triplet_criterion(norm_embeddings_orig, labels, triplet_indices_tuple)
 
@@ -92,44 +93,47 @@ def train(model, dataloader, train_dict_view1, train_dict_view2):
 
         hashing_loss = hashing_criterion(embeddings_orig)
 
-        cont_loss = contrastive_loss(z_i, z_j)
-        #print("triplet loss: ", triplet_loss)
-        #print("hash loss: ", hashing_loss)
         loss = triplet_loss + hashing_loss + cont_loss
-        #print("loss: ", loss)
+
 
 
         # backpropagation
         loss.backward()
-        #plot_grad_flow(model.named_parameters())
         # update the parameters
         optimizer.step()
         # add loss of each item (total items in a batch = batch size)
         running_loss += loss.item()
 
-        #if bi == int(hp.EPOCHS*0.95):
-        #    triplet_mining.type_of_triplets = "hard"
     final_loss = running_loss / (len(ctx_train) / dataloader.batch_size)
 
     return final_loss
 
 #validate model
-def validate(model, dataloader, val_dict_view1, val_dict_view2, epoch):
+def validate(model, dataloader, val_dict, val_dict_view2, epoch):
     model.eval()
     running_loss = 0.0
 
     with torch.no_grad():
         for bi, data in tqdm(enumerate(dataloader), total=int(len(ctx_val) / dataloader.batch_size)):
+            cont_loss = 0
+            if hp.MULTIVIEWS:
+                orig = torch.stack([val_dict[x] for x in data[0]])
+                view2 = torch.stack([val_dict_view2[x] for x in data[0]])
+                #optimizer.zero_grad()
+                embeddings_orig, z_i = model(orig)
+                embeddings_view2, z_j = model(view2)
+                cont_loss = contrastive_loss(z_i, z_j)
+            else:
+                orig = torch.stack([val_dict[x] for x in data[0]])
+                #optimizer.zero_grad()
+                embeddings_orig = model(orig)
             labels = data[1]
-            orig = torch.stack([val_dict_view1[x] for x in data[0]])
-            view2 = torch.stack([val_dict_view2[x] for x in data[0]])
-
-            embeddings_orig, z_i = model(orig)
-            embeddings_view2, z_j = model(view2)
+            #embeddings_orig, z_i = model(orig)
+            #embeddings_view2, z_j = model(view2)
             #print("labels: ", labels)
             #print(embeddings)
             norm_embeddings_orig = F.normalize(embeddings_orig, p=2, dim=1)
-            norm_embeddings_view2 = F.normalize(embeddings_view2, p=2, dim=1)
+            #norm_embeddings_view2 = F.normalize(embeddings_view2, p=2, dim=1)
             #print(norm_embeddings)
             triplet_indices_tuple = triplet_mining(norm_embeddings_orig, labels)
             triplet_loss = triplet_criterion(norm_embeddings_orig, labels, triplet_indices_tuple)
@@ -142,7 +146,7 @@ def validate(model, dataloader, val_dict_view1, val_dict_view2, epoch):
 
             hashing_loss = hashing_criterion(embeddings_orig)
 
-            cont_loss = contrastive_loss(z_i, z_j)
+            #cont_loss = contrastive_loss(z_i, z_j)
             #print("Contrastive: " + str(cont_loss))
             #print("Hashing: " + str(hashing_loss))
             #print("Triplet: " + str(triplet_loss))
@@ -215,31 +219,51 @@ if __name__ == '__main__':
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     print('Computation device: ', device)
 
-    multi_transform = transforms.Compose([
-        transforms.RandomResizedCrop([224,224]),
-        transforms.RandomHorizontalFlip(p=0.5),
-        transforms.RandomRotation(degrees=90),
-        transforms.ToTensor(),
-        transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
-        transforms.RandomApply([AddGaussianNoise(1, 0.5)], 0.5)
-    ])
-    #Use densenet on every image
-    ctx_train_densenet = MultiviewDataset(root="./data/train", transform=multi_transform)
-    train_loader_densenet = torch.utils.data.DataLoader(
-        ctx_train_densenet,
-        batch_size=1,
-        shuffle=False,
-        num_workers=4,
-        pin_memory=True,
-    )
-    ctx_val_densenet = MultiviewDataset(root="./data/val", transform=multi_transform)
-    val_loader_densenet = torch.utils.data.DataLoader(
-        ctx_val_densenet,
-        batch_size=1,
-        shuffle=False,
-        num_workers=4,
-        pin_memory=True,
-    )
+    if hp.MULTIVIEWS:
+        multi_transform = transforms.Compose([
+            transforms.RandomResizedCrop([224,224]),
+            transforms.RandomHorizontalFlip(p=0.5),
+            transforms.RandomRotation(degrees=90),
+            transforms.ToTensor(),
+            transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
+            transforms.RandomApply([AddGaussianNoise(1, 0.5)], 0.5)
+        ])
+        #Use densenet on every image
+        ctx_train_densenet = MultiviewDataset(root="./data/train", transform=multi_transform)
+        train_loader_densenet = torch.utils.data.DataLoader(
+            ctx_train_densenet,
+            batch_size=1,
+            shuffle=False,
+            num_workers=4,
+            pin_memory=True,
+        )
+        ctx_val_densenet = MultiviewDataset(root="./data/val", transform=multi_transform)
+        val_loader_densenet = torch.utils.data.DataLoader(
+            ctx_val_densenet,
+            batch_size=1,
+            shuffle=False,
+            num_workers=4,
+            pin_memory=True,
+        )
+    else:
+        #Use densenet on every image
+        ctx_train_densenet = datasets.ImageFolder(root="./data/train", transform=data_transform)
+        train_loader_densenet = torch.utils.data.DataLoader(
+            ctx_train_densenet,
+            batch_size=1,
+            shuffle=False,
+            num_workers=4,
+            pin_memory=True,
+        )
+        ctx_val_densenet = MultiviewDataset(root="./data/val", transform=data_transform)
+        val_loader_densenet = torch.utils.data.DataLoader(
+            ctx_val_densenet,
+            batch_size=1,
+            shuffle=False,
+            num_workers=4,
+            pin_memory=True,
+        )
+
     encoder = torchvision.models.densenet121(pretrained=True)
     #encoder.classifier = nn.Linear(DENSENET_NUM_FEATURES, 15)
     #encoder.load_state_dict(torch.load("densenet121_pytorch_adapted.pth"))
@@ -247,51 +271,80 @@ if __name__ == '__main__':
     encoder.requires_grad_(False)
     encoder.eval()
     encoder.to(device)
-    train_file_path = Path("./train_view1.p")
-    if train_file_path.is_file():
-        train_dict_view1 = pickle.load(open("train_view1.p","rb"))
-        train_dict_view2 = pickle.load(open("train_view2.p","rb"))
-    else:
-        train_dict_view1 = {}
-        train_dict_view2 = {}
-        for bi, data in tqdm(enumerate(train_loader_densenet), total=int(len(ctx_train_densenet) / train_loader_densenet.batch_size)):
-            #image_data,image_label = data
-            #sample_fname, _ = train_loader_densenet.dataset.samples[bi]
-            #image_data = image_data.to(device)
-            #output = encoder(image_data).squeeze().detach().clone()
-            #train_dict[sample_fname] = output
-            view1, view2 = data
-            sample_fname, _ = train_loader_densenet.dataset.samples[bi]
-            view1 = view1.to(device)
-            view2 = view2.to(device)
-            output1 = encoder(view1).squeeze().detach().clone()
-            output2 = encoder(view2).squeeze().detach().clone()
-            train_dict_view1[sample_fname] = output1
-            train_dict_view2[sample_fname] = output2
-        pickle.dump(train_dict_view1, open("train_view1.p", "wb"))
-        pickle.dump(train_dict_view2, open("train_view2.p", "wb"))
 
-    val_file_path = Path("./val_view1.p")
-    if val_file_path.is_file():
-        val_dict_view1 = pickle.load(open("val_view1.p","rb"))
-        val_dict_view2 = pickle.load(open("val_view2.p","rb"))
-    else:
-        val_dict_view1 = {}
-        val_dict_view2 = {}
-        for bi, data in tqdm(enumerate(val_loader_densenet), total=int(len(ctx_val_densenet) / val_loader_densenet.batch_size)):
-            view1, view2 = data
-            sample_fname, _ = val_loader_densenet.dataset.samples[bi]
-            view1 = view1.to(device)
-            view2 = view2.to(device)
-            output1 = encoder(view1).squeeze().detach().clone()
-            output2 = encoder(view2).squeeze().detach().clone()
-            val_dict_view1[sample_fname] = output1
-            val_dict_view2[sample_fname] = output2
-        pickle.dump(val_dict_view1, open("val_view1.p", "wb"))
-        pickle.dump(val_dict_view2, open("val_view2.p", "wb"))
+    if hp.MULTIVIEWS:
+        train_file_path = Path("./train_view1.p")
+        if train_file_path.is_file():
+            train_dict_view1 = pickle.load(open("train_view1.p","rb"))
+            train_dict_view2 = pickle.load(open("train_view2.p","rb"))
+        else:
+            train_dict_view1 = {}
+            train_dict_view2 = {}
+            for bi, data in tqdm(enumerate(train_loader_densenet), total=int(len(ctx_train_densenet) / train_loader_densenet.batch_size)):
+                #image_data,image_label = data
+                #sample_fname, _ = train_loader_densenet.dataset.samples[bi]
+                #image_data = image_data.to(device)
+                #output = encoder(image_data).squeeze().detach().clone()
+                #train_dict[sample_fname] = output
+                view1, view2 = data
+                sample_fname, _ = train_loader_densenet.dataset.samples[bi]
+                view1 = view1.to(device)
+                view2 = view2.to(device)
+                output1 = encoder(view1).squeeze().detach().clone()
+                output2 = encoder(view2).squeeze().detach().clone()
+                train_dict_view1[sample_fname] = output1
+                train_dict_view2[sample_fname] = output2
+            pickle.dump(train_dict_view1, open("train_view1.p", "wb"))
+            pickle.dump(train_dict_view2, open("train_view2.p", "wb"))
 
+        val_file_path = Path("./val_view1.p")
+        if val_file_path.is_file():
+            val_dict_view1 = pickle.load(open("val_view1.p","rb"))
+            val_dict_view2 = pickle.load(open("val_view2.p","rb"))
+        else:
+            val_dict_view1 = {}
+            val_dict_view2 = {}
+            for bi, data in tqdm(enumerate(val_loader_densenet), total=int(len(ctx_val_densenet) / val_loader_densenet.batch_size)):
+                view1, view2 = data
+                sample_fname, _ = val_loader_densenet.dataset.samples[bi]
+                view1 = view1.to(device)
+                view2 = view2.to(device)
+                output1 = encoder(view1).squeeze().detach().clone()
+                output2 = encoder(view2).squeeze().detach().clone()
+                val_dict_view1[sample_fname] = output1
+                val_dict_view2[sample_fname] = output2
+            pickle.dump(val_dict_view1, open("val_view1.p", "wb"))
+            pickle.dump(val_dict_view2, open("val_view2.p", "wb"))
+    else:
+        train_file_path = Path("./train.p")
+        if train_file_path.is_file():
+            train_dict = pickle.load(open("train.p", "rb"))
+        else:
+            train_dict = {}
+
+            for bi, data in tqdm(enumerate(train_loader_densenet),
+                                 total=int(len(ctx_train_densenet) / train_loader_densenet.batch_size)):
+                image_data,image_label = data
+                sample_fname, _ = train_loader_densenet.dataset.samples[bi]
+                image_data = image_data.to(device)
+                output = encoder(image_data).squeeze().detach().clone()
+                train_dict[sample_fname] = output
+            pickle.dump(train_dict, open("train.p", "wb"))
+        val_file_path = Path("./val.p")
+        if val_file_path.is_file():
+            val_dict = pickle.load(open("val.p", "rb"))
+        else:
+            val_dict = {}
+            for bi, data in tqdm(enumerate(val_loader_densenet),
+                                 total=int(len(ctx_val_densenet) / val_loader_densenet.batch_size)):
+                image_data, image_label = data
+                sample_fname, _ = val_loader_densenet.dataset.samples[bi]
+                image_data = image_data.to(device)
+                output = encoder(image_data).squeeze().detach().clone()
+                val_dict[sample_fname] = output
+            pickle.dump(val_dict, open("val.p", "wb"))
     # initialize the model
-    model = CBIRModel(useEncoder=False)
+    model = CBIRModel(useEncoder=False, useProjector=hp.MULTIVIEWS)
     model.to(device)
     #print(nn.Sequential(*list(model.children())[:-1]))
 
@@ -313,8 +366,12 @@ if __name__ == '__main__':
     # start training and validating
     for epoch in range(hp.EPOCHS):
         print(f"Epoch {epoch + 1} of {hp.EPOCHS}")
-        train_epoch_loss = train(model, train_loader, train_dict_view1, train_dict_view2)
-        val_epoch_loss = validate(model, val_loader, val_dict_view1, val_dict_view2, epoch)
+        if hp.MULTIVIEWS:
+            train_epoch_loss = train(model, train_loader, train_dict_view1, train_dict_view2)
+            val_epoch_loss = validate(model, val_loader, val_dict_view1, val_dict_view2, epoch)
+        else:
+            train_epoch_loss = train(model, train_loader, train_dict, False)
+            val_epoch_loss = validate(model, val_loader, val_dict, False, epoch)
         # save model with best loss
         if val_epoch_loss < best_loss:
             best_epoch = epoch

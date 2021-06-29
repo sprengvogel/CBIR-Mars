@@ -34,7 +34,7 @@ class CBIRModel(nn.Module):
         self.projector = nn.Sequential(
             nn.Linear(hp.HASH_BITS, hp.HASH_BITS, bias=False),
             nn.ReLU(),
-            nn.Linear(hp.HASH_BITS, 256, bias=False),
+            nn.Linear(hp.HASH_BITS, hp.PROJ_DIM, bias=False),
         )
 
     def forward(self, x):
