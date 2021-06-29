@@ -91,6 +91,3 @@ if __name__ == '__main__':
         images.append(image)
     grid = image_grid(images, 8, 8)
     grid.show()
-
-
-    #print(feature_dict)
