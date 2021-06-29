@@ -21,11 +21,6 @@ if __name__ == '__main__':
     print('Computation device: ', device)
 
     # initialize the model
-    densenet = torch.hub.load('pytorch/vision:v0.6.0', 'densenet121', pretrained=True)
-    densenet.to(device)
-    densenet.requires_grad_(False)
-    densenet.eval()
-
     model = CBIRModel()
     model.to(device)
 
@@ -51,18 +46,14 @@ if __name__ == '__main__':
 
     with torch.no_grad():
         for bi, data in tqdm(enumerate(test_loader), total=int(len(ctx_test) / test_loader.batch_size)):
-            print(data)
+            #print(data)
             anchor = data[0].to(device)
             positive = data[1].to(device)
             negative = data[2].to(device)
-
-            dense_anchor = densenet(anchor)
-            dense_positive = densenet(positive)
-            dense_negative = densenet(negative)
-            
-            output_anchor = model(dense_anchor)
-            output_pos = model(dense_positive)
-            output_neg = model(dense_negative)
+          
+            output_anchor = model(anchor)
+            output_pos = model(positive)
+            output_neg = model(negative)
 
             loss = criterion(output_anchor, output_pos, output_neg)
             running_loss += loss.item()

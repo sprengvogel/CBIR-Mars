@@ -27,7 +27,6 @@ def image_grid(imgs, rows, cols):
         grid.paste(img, box=(i % cols * w, i // cols * h))
     return grid
 
-
 if __name__ == '__main__':
 
     # define device
@@ -35,11 +34,6 @@ if __name__ == '__main__':
     print('Computation device: ', device)
 
     # initialize the model
-    densenet = torch.hub.load('pytorch/vision:v0.6.0', 'densenet121', pretrained=True)
-    densenet.to(device)
-    densenet.requires_grad_(False)
-    densenet.eval()
-
     model = CBIRModel()
     model.to(device)
 
@@ -70,8 +64,7 @@ if __name__ == '__main__':
         image_data = data_transform(image).to(device)
         image_data = image_data.unsqueeze(0)
 
-        dense_image_data = densenet(image_data)
-        output = model(dense_image_data)
+        output = model(image_data)
 
         output = output.cpu().detach().numpy()
         hashCode = np.empty(hp.HASH_BITS).astype(np.int8)
@@ -92,10 +85,10 @@ if __name__ == '__main__':
 
     matches_list.sort(key= lambda x : x[1])
     images = []
-    for match in matches_list[:36]:
+    for match in matches_list[:64]:
         image = Image.open(match[0])
         images.append(image)
-    grid = image_grid(images, 6, 6)
+    grid = image_grid(images, 8, 8)
     grid.show()
 
 
