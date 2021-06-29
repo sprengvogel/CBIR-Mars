@@ -12,9 +12,10 @@ def init_weights(m):
 
 
 class CBIRModel(nn.Module):
-    def __init__(self, useEncoder=True):
+    def __init__(self, useEncoder=True, useProjector=True):
         super(CBIRModel, self).__init__()
         self.useEncoder = useEncoder
+        self.useProjector = useProjector
         self.encoder = torchvision.models.densenet121(pretrained=True)
         # self.encoder.classifier = nn.Linear(DENSENET_NUM_FEATURES, 15)
         # self.encoder.load_state_dict(torch.load("densenet121_pytorch_adapted.pth"))
@@ -43,9 +44,12 @@ class CBIRModel(nn.Module):
             output = seq(encoded_features)
         else:
             output = seq(x)
-        z = self.projector(output)
+        if self.useProjector:
+            z = self.projector(output)
+            return nn.Sigmoid()(output), z
+        else:
+            return nn.Sigmoid()(output)
         # print(nn.Sigmoid()(output).shape)
         # print(nn.Sigmoid()(output))
         # print(F.normalize(nn.Sigmoid()(output),1).shape)
         # print(F.normalize(nn.Sigmoid()(output),1))
-        return nn.Sigmoid()(output), z

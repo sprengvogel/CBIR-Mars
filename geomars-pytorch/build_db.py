@@ -16,15 +16,12 @@ import numpy as np
 
 if __name__ == '__main__':
 
-    #Change current working directory to source file location
-    os.chdir(os.path.dirname(__file__))
-
     # define device
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     print('Computation device: ', device)
 
     # initialize the model
-    model = CBIRModel()
+    model = CBIRModel(useProjector=False)
     model.to(device)
 
     #Load state dict
@@ -43,7 +40,7 @@ if __name__ == '__main__':
             ]
         )
 
-    ctx_train = datasets.ImageFolder(root="./data/train", transform=data_transform)
+    ctx_train = datasets.ImageFolder(root="./data/database", transform=data_transform)
     db_loader = torch.utils.data.DataLoader(
         ctx_train,
         batch_size=1,

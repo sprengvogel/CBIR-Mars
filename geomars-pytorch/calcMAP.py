@@ -26,22 +26,25 @@ def image_grid(imgs, rows, cols):
         grid.paste(img, box=(i % cols * w, i // cols * h))
     return grid
 
+
 def getClassFromPath(path):
     return path
+
 
 def getAP(queryLabel, labelList):
     acc = np.zeros((0,)).astype(float)
     correct = 1
     for (i, label) in enumerate(labelList):
         if label == queryLabel:
-            precision = (correct / float(i+1))
+            precision = (correct / float(i + 1))
             acc = np.append(acc, [precision, ], axis=0)
             correct += 1
     if correct == 1:
         return 0.
     num = np.sum(acc)
     den = correct - 1
-    return num/den
+    return num / den
+
 
 if __name__ == '__main__':
 
@@ -53,22 +56,22 @@ if __name__ == '__main__':
     model = CBIRModel()
     model.to(device)
 
-    #Load state dict
-    state_dict_path = os.path.join(os.getcwd(), "outputs/model_best.pth")
+    # Load state dict
+    state_dict_path = os.path.join(os.getcwd(), "outputs/model_last.pth")
 
     if torch.cuda.is_available():
         model.load_state_dict(torch.load(state_dict_path))
     else:
         model.load_state_dict(torch.load(state_dict_path, map_location=torch.device('cpu')))
-    #torch.save(model.state_dict(), "densenet121_pytorch_adapted.pth")
+    # torch.save(model.state_dict(), "densenet121_pytorch_adapted.pth")
 
     data_transform = transforms.Compose(
-            [
-                transforms.Resize([224, 224]),
-                transforms.ToTensor(),
-                transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
-            ]
-        )
+        [
+            transforms.Resize([224, 224]),
+            transforms.ToTensor(),
+            transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+        ]
+    )
 
     ctx_test = datasets.ImageFolder(root="./data/test", transform=data_transform)
     db_loader = torch.utils.data.DataLoader(
@@ -81,31 +84,36 @@ if __name__ == '__main__':
 
     model.eval()
     feature_dict = pickle.load(open("feature_db.p", "rb"))
-    #print(model)
+    # print(model)
     mAP = 0
     with torch.no_grad():
         for bi, data in tqdm(enumerate(db_loader), total=int(len(ctx_test))):
-            image_data,image_label = data
+            image_data, image_label = data
             image_data = image_data.to(device)
             image_label = image_label.cpu().detach().numpy()[0]
             output = model(image_data)
 
             output = output.cpu().detach().numpy()
             hashCode = np.empty(hp.HASH_BITS).astype(np.int8)
-            hashCode = ((np.sign(output -0.5)+1)/2)
-            
+            hashCode = ((np.sign(output - 0.5) + 1) / 2)
+
             query = hashCode
             matches_list = []
             label_list = []
             sample_fname, _ = db_loader.dataset.samples[bi]
-            for key in feature_dict.keys():
+            for i, key in enumerate(feature_dict.keys()):
                 label = feature_dict[key][1]
                 dist = hamming(query, np.array(feature_dict[key][0]))
-                matches_list.append( (key, dist))
+                matches_list.append((key, dist))
                 label_list.append(label)
-            #Sort matches by distance and sort labels in the same way
-            matches_list, label_list = (list(t) for t in zip(*sorted(zip(matches_list,label_list), key= lambda x : x[0][1])))
+
+            # Sort matches by distance and sort labels in the same way
+            matches_list, label_list = (list(t) for t in
+                                        zip(*sorted(zip(matches_list, label_list), key=lambda x: x[0][1])))
+            matches_list = matches_list[:64]
+            label_list = label_list[:64]
             average_precision = getAP(image_label, label_list)
             mAP += average_precision
     mAP /= int(len(ctx_test))
     print(mAP)
+

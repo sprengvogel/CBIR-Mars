@@ -320,9 +320,10 @@ if __name__ == '__main__':
             best_epoch = epoch
             best_loss = val_epoch_loss
             print("Saved Model. Best Epoch: " + str(best_epoch+1))
-            torch.save(nn.Sequential(*list(model.children())[:-1]).state_dict(), 'outputs/model_best.pth')
+            #torch.save(nn.Sequential(*list(model.children())[:-1]).state_dict(), 'outputs/model_best.pth')
+            torch.save(model.state_dict(), 'outputs/model_best.pth')
         print("Saved last Model.")
-        torch.save(nn.Sequential(*list(model.children())[:-1]).state_dict(), 'outputs/model_last.pth')
+        torch.save(model.state_dict(), 'outputs/model_last.pth')
         print(f"Train Loss: {train_epoch_loss}")
         print(f"Val Loss: {val_epoch_loss}")
         train_loss.append(train_epoch_loss)
