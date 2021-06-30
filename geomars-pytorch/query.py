@@ -40,7 +40,7 @@ if __name__ == '__main__':
 
     if hp.DOMAIN_ADAPTION:
         model.useEncoder = False
-        target_transform = WTransform1D(num_features=hp.DENSENET_NUM_FEATURES, group_size=hp.DENSENET_NUM_FEATURES//16)
+        target_transform = WTransform1D(num_features=hp.DENSENET_NUM_FEATURES, group_size=hp.DA_GROUP_SIZE)
 
     #Load state dict
     state_dict_path = os.path.join(os.getcwd(), "outputs/model_last.pth")

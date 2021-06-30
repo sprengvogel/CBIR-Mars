@@ -240,8 +240,8 @@ if __name__ == '__main__':
                 target_list.append(output)
             pickle.dump(target_list, open("database.p", "wb"))
 
-        source_whitening = WTransform1D(num_features=hp.DENSENET_NUM_FEATURES, group_size=hp.DENSENET_NUM_FEATURES//16)
-        target_whitening = WTransform1D(num_features=hp.DENSENET_NUM_FEATURES, group_size=hp.DENSENET_NUM_FEATURES//16)
+        source_whitening = WTransform1D(num_features=hp.DENSENET_NUM_FEATURES, group_size=hp.DA_GROUP_SIZE)
+        target_whitening = WTransform1D(num_features=hp.DENSENET_NUM_FEATURES, group_size=hp.DA_GROUP_SIZE)
         source_whitening.to(device)
         target_whitening.to(device)
         entropy_criterion = EntropyLoss()
