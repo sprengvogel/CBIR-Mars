@@ -12,6 +12,7 @@ import pickle
 from CBIRModel import CBIRModel
 import hparams as hp
 import numpy as np
+from whitening import WTransform1D
 
 
 if __name__ == '__main__':
@@ -24,13 +25,20 @@ if __name__ == '__main__':
     model = CBIRModel()
     model.to(device)
 
+    if hp.DOMAIN_ADAPTION:
+        model.useEncoder = False
+        target_transform = WTransform1D(num_features=hp.DENSENET_NUM_FEATURES, group_size=hp.DA_GROUP_SIZE)
+
     #Load state dict
     state_dict_path = os.path.join(os.getcwd(), "outputs/model_last.pth")
     if torch.cuda.is_available():
         model.load_state_dict(torch.load(state_dict_path))
+        if hp.DOMAIN_ADAPTION:
+            target_transform.load_state_dict(torch.load(os.path.join(os.getcwd(), 'outputs/target_transform.pth')))
     else:
         model.load_state_dict(torch.load(state_dict_path, map_location=torch.device('cpu')))
-
+        if hp.DOMAIN_ADAPTION:
+            target_transform.load_state_dict(torch.load(os.path.join(os.getcwd(), 'outputs/target_transform.pth'), map_location=torch.device('cpu')))
 
     data_transform = transforms.Compose(
             [
@@ -52,12 +60,25 @@ if __name__ == '__main__':
     feature_dict = {}
     model.eval()
 
+    if hp.DOMAIN_ADAPTION:
+        target_transform.eval()
+        encoder = torch.hub.load('pytorch/vision:v0.6.0', 'densenet121', pretrained=True)
+        encoder = torch.nn.Sequential(*(list(encoder.children())[:-1]), nn.AvgPool2d(7))
+        encoder.requires_grad_(False)
+        encoder.eval()
+        encoder.to(device)
+
     with torch.no_grad():
         for bi, data in tqdm(enumerate(db_loader), total=int(len(ctx_train))):# / db_loader.batch_size)):
             image_data,image_label = data
             image_label = image_label.cpu().detach().numpy()[0]
             image_data = image_data.to(device)
-            output = model(image_data)
+            if hp.DOMAIN_ADAPTION:
+                #print(encoder(image_data).squeeze())
+                #print(target_transform(encoder(image_data).squeeze()))
+                output = model(target_transform(encoder(image_data).squeeze()))
+            else:
+                output = model(image_data)
             output = output.cpu().detach().numpy()
 
             hashCode = np.empty(hp.HASH_BITS).astype(np.int8)
