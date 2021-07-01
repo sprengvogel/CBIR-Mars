@@ -6,6 +6,8 @@ import torch.nn as nn
 from torch.utils.data import DataLoader, Dataset
 from tqdm import tqdm
 from torchvision import transforms, datasets
+import numpy as np
+import cv2
 
 
 def removeclassdoublings(indices_tuple, labels):
@@ -79,6 +81,7 @@ class ImageFolderWithLabel(datasets.ImageFolder):
     def __len__(self):
         return len(self.samples)
 
+
 class MultiviewDataset(datasets.ImageFolder):
 
     def __init__(self, root, transform):
@@ -104,6 +107,7 @@ class MultiviewDataset(datasets.ImageFolder):
             view_2 = self.transform(image)
 
         return view_1, view_2
+
 
 class TripletDataset(datasets.ImageFolder):
 

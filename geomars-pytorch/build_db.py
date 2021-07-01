@@ -40,7 +40,7 @@ if __name__ == '__main__':
             ]
         )
 
-    ctx_train = datasets.ImageFolder(root="./data/database", transform=data_transform)
+    ctx_train = datasets.ImageFolder(root="./data/test", transform=data_transform)
     db_loader = torch.utils.data.DataLoader(
         ctx_train,
         batch_size=1,

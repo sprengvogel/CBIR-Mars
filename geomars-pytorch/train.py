@@ -82,8 +82,11 @@ def train(model, dataloader, train_dict, train_dict_view2):
         # embeddings_view2, z_j = model(view2)
         norm_embeddings_orig = F.normalize(embeddings_orig, p=2, dim=1)
 
-        triplet_indices_tuple = triplet_mining(norm_embeddings_orig, labels)
-        triplet_loss = triplet_criterion(norm_embeddings_orig, labels, triplet_indices_tuple)
+        if hp.MULTIVIEWS:
+            triplet_loss = 0
+        else:
+            triplet_indices_tuple = triplet_mining(norm_embeddings_orig, labels)
+            triplet_loss = triplet_criterion(norm_embeddings_orig, labels, triplet_indices_tuple)
 
         if hp.INTERCLASSTRIPLETS:
             interclass_labels = data[2]
@@ -135,8 +138,11 @@ def validate(model, dataloader, val_dict, val_dict_view2, epoch):
             norm_embeddings_orig = F.normalize(embeddings_orig, p=2, dim=1)
             #norm_embeddings_view2 = F.normalize(embeddings_view2, p=2, dim=1)
             #print(norm_embeddings)
-            triplet_indices_tuple = triplet_mining(norm_embeddings_orig, labels)
-            triplet_loss = triplet_criterion(norm_embeddings_orig, labels, triplet_indices_tuple)
+            if hp.MULTIVIEWS:
+                triplet_loss = 0
+            else:
+                triplet_indices_tuple = triplet_mining(norm_embeddings_orig, labels)
+                triplet_loss = triplet_criterion(norm_embeddings_orig, labels, triplet_indices_tuple)
 
             if hp.INTERCLASSTRIPLETS:
                 interclass_labels = data[2]
