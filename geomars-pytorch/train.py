@@ -1,7 +1,6 @@
 from numpy import mod
 import torch
 import time
-from random import randrange, sample
 from torch.nn.modules.container import ModuleList
 import torch.optim as optim
 import torch.nn as nn

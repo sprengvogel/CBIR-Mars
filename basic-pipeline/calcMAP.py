@@ -12,6 +12,7 @@ import sys
 import numpy as np
 import json
 
+SELF_TRAINED = True
 
 def image_grid(imgs, rows, cols):
     assert len(imgs) == rows * cols
@@ -43,24 +44,21 @@ def getAP(queryLabel, labelList):
 
 if __name__ == '__main__':
 
-
-    #Change current working directory to source file location
-    os.chdir(os.path.dirname(__file__))
-
-    #batch_size = 16
-    num_classes = 15
     # define device
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     print('Computation device: ', device)
 
+    #Select state dict
+    if SELF_TRAINED:
+        state_dict_path = os.path.join(os.getcwd(), "outputs/model_best.pth")
+    else:
+        state_dict_path = os.path.join(os.getcwd(), "densenet121_pytorch_adapted.pth")
+
     # initialize the model
     model = torch.hub.load('pytorch/vision:v0.6.0', 'densenet121', pretrained=False)
-    num_ftrs = model.classifier.in_features
-    model.classifier = nn.Linear(num_ftrs, num_classes)
+    model = torch.nn.Sequential(*(list(model.children())[:-1]), nn.AvgPool2d(7))
     model.to(device)
 
-    #Load state dict
-    state_dict_path = os.path.join(os.getcwd(), "densenet121_pytorch_adapted.pth")
     if torch.cuda.is_available():
         model.load_state_dict(torch.load(state_dict_path))
     else:
@@ -99,12 +97,11 @@ if __name__ == '__main__':
             image_data, image_label = data
             image_data = image_data.to(device)
             image_label = image_label.cpu().detach().numpy()[0]
-            output = tf_last_layer_chopped(image_data)
+            output = model(image_data)
+            fVector = output.cpu().numpy()
+            fVector = fVector.squeeze()
 
-            output = pool(output).cpu().numpy()
-            output = output.squeeze()
-
-            query = output
+            query = fVector
             matches_list = []
             label_list = []
             sample_fname, _ = db_loader.dataset.samples[bi]
@@ -119,6 +116,8 @@ if __name__ == '__main__':
                 label_list.append(label)
             #Sort matches by distance and sort labels in the same way
             matches_list, label_list = (list(t) for t in zip(*sorted(zip(matches_list,label_list), key= lambda x : x[0][1])))
+            matches_list = matches_list[:64]
+            label_list = label_list[:64]
             average_precision = getAP(image_label, label_list)
             mAP += average_precision
     mAP /= int(len(ctx_test))
