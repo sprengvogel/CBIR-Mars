@@ -10,6 +10,7 @@ from PIL import Image
 import sys
 import numpy as np
 import pickle
+import math
 import hparams as hp
 from CBIRModel import CBIRModel
 from scipy.spatial.distance import hamming
@@ -26,9 +27,6 @@ def image_grid(imgs, rows, cols):
         grid.paste(img, box=(i % cols * w, i // cols * h))
     return grid
 
-def getClassFromPath(path):
-    return path
-
 def getAP(queryLabel, labelList):
     acc = np.zeros((0,)).astype(float)
     correct = 1
@@ -42,6 +40,49 @@ def getAP(queryLabel, labelList):
     num = np.sum(acc)
     den = correct - 1
     return num/den
+
+def getCoordinatesFromPath(inPath):
+    pathComponents = inPath.split("_")
+    coordComponent = pathComponents[-3]
+    sepIndex = max(coordComponent.find("S"), coordComponent.find("N")) +1
+
+    latStr = coordComponent[:sepIndex]
+    latStr = latStr[:-1], latStr[-1]
+    if latStr[1] == "N":
+        lat = int(latStr[0])
+    else:
+        lat = -int(latStr[0])
+
+    lonStr = coordComponent[sepIndex:]
+    lonStr = lonStr[:-1], lonStr[-1]
+    if lonStr[1] == "E":
+        lon = int(lonStr[0])
+    else:
+        lon = -int(lonStr[0])
+
+    return lat, lon
+
+def getOnMarsDistance(queryPath, matchesList):
+    lat1, lon1 = getCoordinatesFromPath(queryPath)
+
+    marsRadius = 3389.5
+
+    lat1 = math.radians(lat1)
+    lon1 = math.radians(lon1)
+    distanceList = []
+    for match in matchesList:
+        lat2, lon2 = getCoordinatesFromPath(match[0])
+        lat2 = math.radians(lat2)
+        lon2 = math.radians(lon2)
+        dlat = lat2 - lat1
+        dlon = lon2 - lon1
+        a = math.sin(dlat / 2)**2 + math.cos(lat1) * math.cos(lat2) * math.sin(dlon / 2)**2
+        c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+        distance = marsRadius * c
+        distanceList.append(distance)
+
+    return sum(distanceList)/len(distanceList) , distanceList
+
 
 def  calc_map():
 
@@ -83,6 +124,7 @@ def  calc_map():
     feature_dict = pickle.load(open("feature_db.p", "rb"))
     #print(model)
     mAP = 0
+    marsDistanceAvg = 0
     with torch.no_grad():
         for bi, data in tqdm(enumerate(db_loader), total=int(len(ctx_test))):
             image_data,image_label = data
@@ -110,8 +152,11 @@ def  calc_map():
             label_list = label_list[:64]
             average_precision = getAP(image_label, label_list)
             mAP += average_precision
+            marsDistanceAvg += getOnMarsDistance(sample_fname, matches_list)[0]
     mAP /= int(len(ctx_test))
+    marsDistanceAvg /= int(len(ctx_test))
     print(mAP)
+    print(marsDistanceAvg)
 
 if __name__ == '__main__':
     calc_map()

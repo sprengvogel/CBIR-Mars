@@ -18,6 +18,7 @@ from pathlib import Path
 from pytorch_metric_learning import losses, miners, distances, reducers
 import os
 from whitening import WTransform1D, EntropyLoss
+from random import sample
 
 # train the model
 def train(model, dataloader, train_dict):
@@ -202,7 +203,7 @@ if __name__ == '__main__':
     encoder.eval()
     encoder.to(device)
 
-    
+
     train_dict = {}
     for bi, data in tqdm(enumerate(train_loader_densenet), total=int(len(ctx_train_densenet) / train_loader_densenet.batch_size)):
         image_data,image_label = data
