@@ -15,7 +15,71 @@ import hparams as hp
 from CBIRModel import CBIRModel
 from scipy.spatial.distance import hamming
 from whitening import WTransform1D
+import math
 
+def getClassFromPath(inPath):
+    return os.path.split(inPath)[0][-3:]
+
+def getAP(queryPath, matchesList):
+    queryLabel = getClassFromPath(queryPath)
+    labelList = []
+    for match in matchesList:
+        labelList.append(getClassFromPath(match[0]))
+    print(labelList)
+    acc = np.zeros((0,)).astype(float)
+    correct = 1
+    for (i, label) in enumerate(labelList):
+        if label == queryLabel:
+            precision = (correct / float(i+1))
+            acc = np.append(acc, [precision, ], axis=0)
+            correct += 1
+    if correct == 1:
+        return 0.
+    num = np.sum(acc)
+    den = correct - 1
+    return num/den
+
+def getCoordinatesFromPath(inPath):
+    pathComponents = inPath.split("_")
+    coordComponent = pathComponents[-3]
+    sepIndex = max(coordComponent.find("S"), coordComponent.find("N")) +1
+    lonStr = coordComponent[:sepIndex]
+    lonStr = lonStr[:-1], lonStr[-1]
+    if lonStr[1] == "N":
+        lon = int(lonStr[0])
+    else:
+        lon = -int(lonStr[0])
+    latStr = coordComponent[sepIndex:]
+    latStr = latStr[:-1], latStr[-1]
+    if latStr[1] == "E":
+        lat = int(latStr[0])
+    else:
+        lat = -int(latStr[0])
+
+    return lon ,lat
+
+def getOnMarsDistance(queryPath, matchesList):
+    lon1, lat1 = getCoordinatesFromPath(queryPath)
+
+    marsRadius = 3389.5
+
+    lon1 = math.radians(lon1)
+    lat1 = math.radians(lat1)
+    print(lon1, lat1)
+    distanceList = []
+    for match in matchesList:
+        lon2, lat2 = getCoordinatesFromPath(match[0])
+        lon2 = math.radians(lon2)
+        lat2 = math.radians(lat2)
+        dlon = lon2 - lon1
+        dlat = lat2 - lat1
+        a = math.sin(dlat / 2)**2 + math.cos(lat1) * math.cos(lat2) * math.sin(dlon / 2)**2
+        c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+        distance = marsRadius * c
+        print(distance)
+        distanceList.append(distance)
+    print(sum(distanceList)/len(distanceList))
+    return 0
 
 def image_grid(imgs, rows, cols):
     assert len(imgs) == rows * cols
@@ -113,11 +177,17 @@ if __name__ == '__main__':
             #print(dist)
 
     matches_list.sort(key= lambda x : x[1])
+
     images = []
     for match in matches_list[:64]:
         image = Image.open(match[0])
         print(match[0] ,np.array(feature_dict[match[0]][0]), match[1])
         images.append(image)
+
+    print("Average Precision for this query is: ", getAP(sys.argv[1], matches_list[:64]))
+    #coordinate_distance = getOnMarsDistance(sys.argv[1], matches_list[:64])
+    #print("Image Location distance on the surface of Mars: ", coordinate_distance)
+
     grid = image_grid(images, 8, 8)
     grid.show()
 
