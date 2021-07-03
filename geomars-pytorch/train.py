@@ -202,31 +202,24 @@ if __name__ == '__main__':
     encoder.eval()
     encoder.to(device)
 
-    train_file_path = Path("./train.p")
-    if train_file_path.is_file():
-        train_dict = pickle.load(open("train.p","rb"))
-    else:
-        train_dict = {}
-        for bi, data in tqdm(enumerate(train_loader_densenet), total=int(len(ctx_train_densenet) / train_loader_densenet.batch_size)):
-            image_data,image_label = data
-            sample_fname, _ = train_loader_densenet.dataset.samples[bi]
-            image_data = image_data.to(device)
-            output = encoder(image_data).squeeze().detach().clone()
-            train_dict[sample_fname] = output
-        pickle.dump(train_dict, open("train.p", "wb"))
+    
+    train_dict = {}
+    for bi, data in tqdm(enumerate(train_loader_densenet), total=int(len(ctx_train_densenet) / train_loader_densenet.batch_size)):
+        image_data,image_label = data
+        sample_fname, _ = train_loader_densenet.dataset.samples[bi]
+        image_data = image_data.to(device)
+        output = encoder(image_data).squeeze().detach().clone()
+        train_dict[sample_fname] = output
 
-    val_file_path = Path("./val.p")
-    if val_file_path.is_file():
-        val_dict = pickle.load(open("val.p","rb"))
-    else:
-        val_dict = {}
-        for bi, data in tqdm(enumerate(val_loader_densenet), total=int(len(ctx_val_densenet) / val_loader_densenet.batch_size)):
-            image_data,image_label = data
-            sample_fname, _ = val_loader_densenet.dataset.samples[bi]
-            image_data = image_data.to(device)
-            output = encoder(image_data).squeeze().detach().clone()
-            val_dict[sample_fname] = output
-        pickle.dump(val_dict, open("val.p", "wb"))
+
+
+    val_dict = {}
+    for bi, data in tqdm(enumerate(val_loader_densenet), total=int(len(ctx_val_densenet) / val_loader_densenet.batch_size)):
+        image_data,image_label = data
+        sample_fname, _ = val_loader_densenet.dataset.samples[bi]
+        image_data = image_data.to(device)
+        output = encoder(image_data).squeeze().detach().clone()
+        val_dict[sample_fname] = output
 
     if hp.DOMAIN_ADAPTION:
         ctx_target_densenet = datasets.ImageFolder(root="./data/database", transform=data_transform)
@@ -237,18 +230,14 @@ if __name__ == '__main__':
             num_workers=4,
             pin_memory=True,
         )
-        target_file_path = Path("./database.p")
-        if target_file_path.is_file():
-            target_list = pickle.load(open("database.p","rb"))
-        else:
-            target_list= []
-            for bi, data in tqdm(enumerate(target_loader_densenet), total=int(len(ctx_target_densenet) / target_loader_densenet.batch_size)):
-                image_data, _ = data
-                sample_fname, _ = target_loader_densenet.dataset.samples[bi]
-                image_data = image_data.to(device)
-                output = encoder(image_data).squeeze().detach().clone()
-                target_list.append(output)
-            pickle.dump(target_list, open("database.p", "wb"))
+
+        target_list= []
+        for bi, data in tqdm(enumerate(target_loader_densenet), total=int(len(ctx_target_densenet) / target_loader_densenet.batch_size)):
+            image_data, _ = data
+            sample_fname, _ = target_loader_densenet.dataset.samples[bi]
+            image_data = image_data.to(device)
+            output = encoder(image_data).squeeze().detach().clone()
+            target_list.append(output)
 
         source_whitening = WTransform1D(num_features=hp.DENSENET_NUM_FEATURES, group_size=hp.DA_GROUP_SIZE)
         target_whitening = WTransform1D(num_features=hp.DENSENET_NUM_FEATURES, group_size=hp.DA_GROUP_SIZE)

@@ -43,7 +43,7 @@ def getAP(queryLabel, labelList):
     den = correct - 1
     return num/den
 
-if __name__ == '__main__':
+def  calc_map():
 
     # define device
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
@@ -112,3 +112,6 @@ if __name__ == '__main__':
             mAP += average_precision
     mAP /= int(len(ctx_test))
     print(mAP)
+
+if __name__ == '__main__':
+    calc_map()

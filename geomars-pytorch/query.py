@@ -92,7 +92,7 @@ def image_grid(imgs, rows, cols):
         grid.paste(img, box=(i % cols * w, i // cols * h))
     return grid
 
-if __name__ == '__main__':
+def query():
 
     # define device
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
@@ -193,3 +193,6 @@ if __name__ == '__main__':
 
 
     #print(feature_dict)
+
+if __name__=='main':
+    query()

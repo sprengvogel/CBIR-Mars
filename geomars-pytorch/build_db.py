@@ -15,8 +15,7 @@ import numpy as np
 from whitening import WTransform1D
 
 
-if __name__ == '__main__':
-
+def build_db():
     # define device
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     print('Computation device: ', device)
@@ -98,3 +97,6 @@ if __name__ == '__main__':
             feature_dict[sample_fname] = (hashCode.tolist(), image_label)
     #print(feature_dict)
     pickle.dump(feature_dict, open("feature_db.p", "wb"))
+
+if __name__ == '__main__':
+    build_db()
