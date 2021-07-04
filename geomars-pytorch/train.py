@@ -140,11 +140,11 @@ def train(model, dataloader, train_dict, train_dict_view2):
             triplet_indices_tuple = triplet_mining(norm_embeddings_orig, labels)
             triplet_loss = triplet_criterion(norm_embeddings_orig, labels, triplet_indices_tuple)
 
-        if hp.INTERCLASSTRIPLETS:
-            interclass_labels = data[2]
-            inter_class_triplet_indices_tuple = triplet_mining(norm_embeddings_orig, interclass_labels)
-            inter_class_triplet_indices_tuple = removeclassdoublings(inter_class_triplet_indices_tuple, labels)
-            triplet_loss += triplet_criterion(norm_embeddings_orig, interclass_labels, inter_class_triplet_indices_tuple)
+            if hp.INTERCLASSTRIPLETS:
+                interclass_labels = data[2]
+                inter_class_triplet_indices_tuple = triplet_mining(norm_embeddings_orig, interclass_labels)
+                inter_class_triplet_indices_tuple = removeclassdoublings(inter_class_triplet_indices_tuple, labels)
+                triplet_loss += triplet_criterion(norm_embeddings_orig, interclass_labels, inter_class_triplet_indices_tuple)
 
         hashing_loss = hashing_criterion(embeddings_orig)
 
@@ -153,7 +153,10 @@ def train(model, dataloader, train_dict, train_dict_view2):
         if hp.DOMAIN_ADAPTION:
             target_inputs = torch.stack(sample(target_list, len(data[0])))
             target_inputs = target_whitening(target_inputs)
-            target_embeddings = model(target_inputs)
+            if hp.MULTIVIEWS:
+                target_embeddings, _ = model(target_inputs)
+            else:
+                target_embeddings = model(target_inputs)
             entropy_loss = entropy_criterion(target_embeddings)
             loss += entropy_loss
 
@@ -209,11 +212,11 @@ def validate(model, dataloader,val_dict, val_dict_view2, epoch):
                 triplet_indices_tuple = triplet_mining(norm_embeddings_orig, labels)
                 triplet_loss = triplet_criterion(norm_embeddings_orig, labels, triplet_indices_tuple)
 
-            if hp.INTERCLASSTRIPLETS:
-                interclass_labels = data[2]
-                inter_class_triplet_indices_tuple = triplet_mining(norm_embeddings_orig, interclass_labels)
-                inter_class_triplet_indices_tuple = removeclassdoublings(inter_class_triplet_indices_tuple, labels)
-                triplet_loss += triplet_criterion(norm_embeddings_orig, interclass_labels, inter_class_triplet_indices_tuple)
+                if hp.INTERCLASSTRIPLETS:
+                    interclass_labels = data[2]
+                    inter_class_triplet_indices_tuple = triplet_mining(norm_embeddings_orig, interclass_labels)
+                    inter_class_triplet_indices_tuple = removeclassdoublings(inter_class_triplet_indices_tuple, labels)
+                    triplet_loss += triplet_criterion(norm_embeddings_orig, interclass_labels, inter_class_triplet_indices_tuple)
 
             hashing_loss = hashing_criterion(embeddings_orig)
 
@@ -258,7 +261,7 @@ if __name__ == '__main__':
     )
 
 
-    ctx_train = ImageFolderWithLabel(root="./data/train", transform=data_transform, interclasstriplets = hp.INTERCLASSTRIPLETS, n_clusters = hp.KMEANS_CLUSTERS)
+    ctx_train = ImageFolderWithLabel(root="./data/train", transform=data_transform, interclasstriplets = (hp.INTERCLASSTRIPLETS and not hp.MULTIVIEWS), n_clusters = hp.KMEANS_CLUSTERS)
     train_loader = torch.utils.data.DataLoader(
         ctx_train,
         batch_size=hp.BATCH_SIZE,
@@ -268,7 +271,7 @@ if __name__ == '__main__':
         drop_last=hp.MULTIVIEWS
     )
 
-    ctx_val = ImageFolderWithLabel(root="./data/val", transform=data_transform, interclasstriplets = hp.INTERCLASSTRIPLETS, n_clusters = hp.KMEANS_CLUSTERS)
+    ctx_val = ImageFolderWithLabel(root="./data/val", transform=data_transform, interclasstriplets = (hp.INTERCLASSTRIPLETS and not hp.MULTIVIEWS), n_clusters = hp.KMEANS_CLUSTERS)
     val_loader = torch.utils.data.DataLoader(
         ctx_val,
         batch_size=hp.BATCH_SIZE,
@@ -283,7 +286,7 @@ if __name__ == '__main__':
         batch_size=hp.BATCH_SIZE,
         shuffle=False,
         num_workers=4,
-        drop_last=True
+        drop_last=False
     )
 
     # define device
