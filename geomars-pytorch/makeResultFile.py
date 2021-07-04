@@ -28,5 +28,5 @@ if __name__ == '__main__':
         result_dict[imagepath]["query_distances"] = distance_list
 
     print(result_dict)
-    with open("result.json", "w") as f:
+    with open("results/result.json", "w") as f:
         json.dump(result_dict, f, indent=4)
