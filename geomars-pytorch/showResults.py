@@ -23,9 +23,10 @@ if __name__ == '__main__':
     "data/test/sfe/B11_014000_2062_XN_26N186W_CX2066_CY2437.jpg",
     "data/test/sfx/B01_009847_1486_XI_31S197W_CX4011_CY1016.jpg",
     "data/test/smo/B07_012490_1826_XI_02N358W_CX1369_CY939.jpg",
-    "data/test/tex/B01_009863_2303_XI_50N284W_CX11292_CY34404.jpg"]
+    "data/test/tex/B01_009863_2303_XI_50N284W_CX11292_CY34404.jpg"
+    ]
 
-    with open("result.json", "r") as f:
+    with open("results/result.json", "r") as f:
         result_dict = json.load(f)
 
     for imagepath in image_list:
@@ -38,4 +39,3 @@ if __name__ == '__main__':
             images.append(image)
         grid = image_grid(images, 8, 8)
         grid.show()
-    
