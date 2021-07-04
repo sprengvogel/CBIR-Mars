@@ -20,6 +20,72 @@ from pathlib import Path
 from pytorch_metric_learning import losses, miners, distances, reducers
 import os
 from data import MultiviewDataset
+import torch.distributed as dist
+
+
+class GatherLayer(torch.autograd.Function):
+    """Gather tensors from all process, supporting backward propagation."""
+
+    @staticmethod
+    def forward(ctx, input):
+        ctx.save_for_backward(input)
+        output = [torch.zeros_like(input) for _ in range(dist.get_world_size())]
+        dist.all_gather(output, input)
+        return tuple(output)
+
+    @staticmethod
+    def backward(ctx, *grads):
+        (input,) = ctx.saved_tensors
+        grad_out = torch.zeros_like(input)
+        grad_out[:] = grads[dist.get_rank()]
+        return grad_out
+
+
+class NT_Xent(nn.Module):
+    def __init__(self, batch_size, temperature, world_size):
+        super(NT_Xent, self).__init__()
+        self.batch_size = batch_size
+        self.temperature = temperature
+        self.world_size = world_size
+
+        self.mask = self.mask_correlated_samples(batch_size, world_size)
+        self.criterion = nn.CrossEntropyLoss(reduction="sum")
+        self.similarity_f = nn.CosineSimilarity(dim=2)
+
+    def mask_correlated_samples(self, batch_size, world_size):
+        N = 2 * batch_size * world_size
+        mask = torch.ones((N, N), dtype=bool)
+        mask = mask.fill_diagonal_(0)
+        for i in range(batch_size * world_size):
+            mask[i, batch_size + i] = 0
+            mask[batch_size + i, i] = 0
+        return mask
+
+    def forward(self, z_i, z_j):
+        """
+        We do not sample negative examples explicitly.
+        Instead, given a positive pair, similar to (Chen et al., 2017), we treat the other 2(N − 1) augmented examples within a minibatch as negative examples.
+        """
+        N = 2 * self.batch_size * self.world_size
+
+        z = torch.cat((z_i, z_j), dim=0)
+        if self.world_size > 1:
+            z = torch.cat(GatherLayer.apply(z), dim=0)
+
+        sim = self.similarity_f(z.unsqueeze(1), z.unsqueeze(0)) / self.temperature
+
+        sim_i_j = torch.diag(sim, self.batch_size * self.world_size)
+        sim_j_i = torch.diag(sim, -self.batch_size * self.world_size)
+
+        # We have 2N samples, but with Distributed training every GPU gets N examples too, resulting in: 2xNxN
+        positive_samples = torch.cat((sim_i_j, sim_j_i), dim=0).reshape(N, 1)
+        negative_samples = sim[self.mask].reshape(N, -1)
+
+        labels = torch.zeros(N).to(positive_samples.device).long()
+        logits = torch.cat((positive_samples, negative_samples), dim=1)
+        loss = self.criterion(logits, labels)
+        loss /= N
+        return loss
 
 
 class AddGaussianNoise(object):
@@ -32,28 +98,6 @@ class AddGaussianNoise(object):
 
     def __repr__(self):
         return self.__class__.__name__ + '(mean={0}, std={1})'.format(self.mean, self.std)
-
-def contrastive_loss(z_i, z_j):
-    z_i = F.normalize(z_i, dim=1)
-    z_j = F.normalize(z_j, dim=1)
-
-    temperature = 0.1
-    batch_size = z_i.size()[0]
-    negatives_mask = torch.eye(batch_size * 2, batch_size * 2, dtype=bool).float().to(device)
-
-    representations = torch.cat([z_i, z_j], dim=0)
-    similarity_matrix = F.cosine_similarity(representations.unsqueeze(1), representations.unsqueeze(0), dim=2)
-
-    sim_ij = torch.diag(similarity_matrix, batch_size)
-    sim_ji = torch.diag(similarity_matrix, -batch_size)
-    positives = torch.cat([sim_ij, sim_ji], dim=0)
-
-    nominator = torch.exp(positives / temperature)
-    denominator = negatives_mask * torch.exp(similarity_matrix / temperature)
-
-    loss_partial = -torch.log(nominator / torch.sum(denominator, dim=1))
-    loss = torch.sum(loss_partial) / (2 * batch_size)
-    return loss
 
 
 # train the model
@@ -68,7 +112,7 @@ def train(model, dataloader, train_dict, train_dict_view2):
             optimizer.zero_grad()
             embeddings_orig, z_i = model(orig)
             embeddings_view2, z_j = model(view2)
-            cont_loss = contrastive_loss(z_i, z_j)
+            cont_loss = cont_criterion(z_i, z_j)
         else:
             orig = torch.stack([train_dict[x] for x in data[0]])
             optimizer.zero_grad()
@@ -98,8 +142,6 @@ def train(model, dataloader, train_dict, train_dict_view2):
 
         loss = triplet_loss + hashing_loss + cont_loss
 
-
-
         # backpropagation
         loss.backward()
         # update the parameters
@@ -125,7 +167,7 @@ def validate(model, dataloader, val_dict, val_dict_view2, epoch):
                 #optimizer.zero_grad()
                 embeddings_orig, z_i = model(orig)
                 embeddings_view2, z_j = model(view2)
-                cont_loss = contrastive_loss(z_i, z_j)
+                cont_loss = cont_criterion(z_i, z_j)
             else:
                 orig = torch.stack([val_dict[x] for x in data[0]])
                 #optimizer.zero_grad()
@@ -159,7 +201,7 @@ def validate(model, dataloader, val_dict, val_dict_view2, epoch):
             #print("triplet loss: ", triplet_loss)
             #print("hash loss: ", hashing_loss)
             loss = triplet_loss + hashing_loss + cont_loss
-
+            #loss = cont_loss
             # add loss of each item (total items in a batch = batch size)
             running_loss += loss.item()
     final_loss = running_loss / (len(ctx_val)/ dataloader.batch_size)
@@ -203,6 +245,7 @@ if __name__ == '__main__':
         shuffle=True,
         num_workers=4,
         pin_memory=True,
+        drop_last=True
     )
 
     ctx_val = ImageFolderWithLabel(root="./data/val", transform=data_transform, interclasstriplets = hp.INTERCLASSTRIPLETS, n_clusters = hp.KMEANS_CLUSTERS)
@@ -210,7 +253,8 @@ if __name__ == '__main__':
         ctx_val,
         batch_size=hp.BATCH_SIZE,
         shuffle=True,
-        num_workers=4
+        num_workers=4,
+        drop_last=True
     )
 
     ctx_test = ImageFolderWithLabel(root="./data/test", transform=data_transform)
@@ -218,7 +262,8 @@ if __name__ == '__main__':
         ctx_test,
         batch_size=hp.BATCH_SIZE,
         shuffle=False,
-        num_workers=4
+        num_workers=4,
+        drop_last=True
     )
 
     # define device
@@ -362,8 +407,9 @@ if __name__ == '__main__':
     distance = distances.LpDistance()#distances.CosineSimilarity()#
     reducer = reducers.ThresholdReducer(low = 0)#DoNothingReducer()#
     triplet_criterion = losses.TripletMarginLoss(margin = hp.MARGIN, distance = distance, reducer = reducer)
+    # contrastive_criterion = losses.ContrastiveLoss()
     triplet_mining = miners.TripletMarginMiner(margin = hp.MARGIN, distance = distance, type_of_triplets = "semihard")
-
+    cont_criterion = NT_Xent(hp.BATCH_SIZE, hp.TEMPERATURE, world_size=1)
     train_loss, val_loss = [], []
     start = time.time()
     best_loss = 1000
