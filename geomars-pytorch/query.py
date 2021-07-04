@@ -184,7 +184,10 @@ def query(input):
 
 if __name__ == '__main__':
     input = sys.argv[1]
-    matches_list = query(input)
+    matches_list,_,_,_ = query(input)
+
+    image = Image.open(input)
+    image.show()
 
     feature_dict = pickle.load(open("feature_db.p", "rb"))
     images = []
