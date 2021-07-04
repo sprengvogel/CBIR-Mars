@@ -2,30 +2,46 @@ import torch
 import time
 import torch.optim as optim
 import torch.nn as nn
+import torch.nn.functional as F
 from torch.utils.data import DataLoader, Dataset
 from tqdm import tqdm
 from torchvision import transforms, datasets
-
+from pytorch_metric_learning import losses, miners, distances, reducers
+import os
+import matplotlib.pyplot as plt
 
 # train the model
 def train(model, dataloader):
     model.train()
     running_loss = 0.0
     for bi, data in tqdm(enumerate(dataloader), total=int(len(ctx_train) / dataloader.batch_size)):
-        image_data = data[0].to(device)
-        label = data[1].to(device)
+        inputs = data[0].to(device)
+        labels = data[1].to(device)
+
         # zero grad the optimizer
         optimizer.zero_grad()
-        outputs = model(image_data)
-        model.train()
-        loss = criterion(outputs, label)
-        # backpropagation
+        embeddings = model(inputs)
+        embeddings = embeddings.squeeze()
+        norm_embeddings = F.normalize(embeddings, p=2, dim=1)
+
+        triplet_indices_tuple = triplet_mining(norm_embeddings, labels)
+        triplet_loss = triplet_criterion(norm_embeddings, labels, triplet_indices_tuple)
+
+        #print("triplet loss: ", triplet_loss)
+        #print("hash loss: ", hashing_loss)
+
+        loss = triplet_loss
+
         loss.backward()
+        #plot_grad_flow(model.named_parameters())
         # update the parameters
         optimizer.step()
         # add loss of each item (total items in a batch = batch size)
         running_loss += loss.item()
-    final_loss = running_loss / len(ctx_train)
+
+        #if bi == int(hp.EPOCHS*0.95):
+        #    triplet_mining.type_of_triplets = "hard"
+    final_loss = running_loss / (len(ctx_train) / dataloader.batch_size)
 
     return final_loss
 
@@ -36,14 +52,22 @@ def validate(model, dataloader, epoch):
 
     with torch.no_grad():
         for bi, data in tqdm(enumerate(dataloader), total=int(len(ctx_val) / dataloader.batch_size)):
-            image_data = (data[0].to(device))
-            label = data[1].to(device)
+            inputs = data[0].to(device)
+            labels = data[1].to(device)
 
-            outputs = model(image_data)
-            loss = criterion(outputs, label)
+            embeddings = model(inputs)
+            embeddings = embeddings.squeeze()
+
+            norm_embeddings = F.normalize(embeddings, p=2, dim=1)
+
+            triplet_indices_tuple = triplet_mining(norm_embeddings, labels)
+            triplet_loss = triplet_criterion(norm_embeddings, labels, triplet_indices_tuple)
+
+            loss = triplet_loss
+
             # add loss of each item (total items in a batch = batch size)
             running_loss += loss.item()
-    final_loss = running_loss / len(ctx_val)
+    final_loss = running_loss / (len(ctx_val)/ dataloader.batch_size)
 
     return final_loss
 
@@ -51,8 +75,7 @@ def validate(model, dataloader, epoch):
 if __name__ == '__main__':
 
     batch_size = 16
-    num_classes = 15
-    epochs = 2
+    epochs = 50
 
     data_transform = transforms.Compose(
         [
@@ -88,13 +111,17 @@ if __name__ == '__main__':
     # initialize the model
 
     model = torch.hub.load('pytorch/vision:v0.6.0', 'densenet121', pretrained=True)
-    num_ftrs = model.classifier.in_features
-    model.classifier = nn.Linear(num_ftrs, num_classes)
+    model = torch.nn.Sequential(*(list(model.children())[:-1]), nn.AvgPool2d(7))
     model.to(device)
 
     # define loss criterion and optimizer. Also initialize learning rate scheduler
-    criterion = nn.CrossEntropyLoss()
-    optimizer = optim.SGD(model.parameters(), lr=0.0001, momentum=0.9)
+    # define optimizer. Also initialize learning rate scheduler
+    optimizer = optim.Adam(model.parameters(), lr=0.0001, betas=(0.9,0.999))
+
+    distance = distances.LpDistance()#distances.CosineSimilarity()#
+    reducer = reducers.ThresholdReducer(low = 0)#DoNothingReducer()#
+    triplet_criterion = losses.TripletMarginLoss(margin = 0.2, distance = distance, reducer = reducer)
+    triplet_mining = miners.TripletMarginMiner(margin = 0.2, distance = distance, type_of_triplets = "semihard")
 
 
     train_loss, val_loss = [], []
@@ -113,10 +140,17 @@ if __name__ == '__main__':
             best_loss = val_epoch_loss
             print("Saved Model. Best Epoch: " + str(best_epoch))
             torch.save(model.state_dict(), 'outputs/model_best.pth')
+        print("Saved last Model.")
+        torch.save(model.state_dict(), 'outputs/model_last.pth')
         print(f"Train Loss: {train_epoch_loss}")
         print(f"Val Loss: {val_epoch_loss}")
         train_loss.append(train_epoch_loss)
         val_loss.append(val_epoch_loss)
     end = time.time()
+    plt.plot(train_loss)
+    plt.plot(val_loss)
+    plt.ylabel('loss')
+    plt.xlabel('epoch')
+    plt.show()
     print(f"Finished training in: {((end - start) / 60):.3f} minutes")
-    print(best_epoch)
+    print(f"Best performing Epoch:: {best_epoch}.")

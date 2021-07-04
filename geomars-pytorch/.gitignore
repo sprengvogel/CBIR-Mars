@@ -6,6 +6,7 @@
 /src/__pycache__
 /.idea
 /outputs
+*.json
 densenet121.pth
 feature_db.json
 feature_db_pretrained_densenet121.json
