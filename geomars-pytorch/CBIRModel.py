@@ -14,11 +14,13 @@ def init_weights(m):
 class CBIRModel(nn.Module):
     def __init__(self, useEncoder=True, useProjector=True):
         super(CBIRModel, self).__init__()
+
         self.useEncoder = useEncoder
         self.useProjector = useProjector
         self.encoder = torchvision.models.densenet121(pretrained=True)
         # self.encoder.classifier = nn.Linear(DENSENET_NUM_FEATURES, 15)
         # self.encoder.load_state_dict(torch.load("densenet121_pytorch_adapted.pth"))
+
         self.encoder = torch.nn.Sequential(*(list(self.encoder.children())[:-1]), nn.AvgPool2d(7))
         self.encoder.requires_grad_(False)
         self.encoder.eval()
@@ -38,6 +40,7 @@ class CBIRModel(nn.Module):
         )
 
     def forward(self, x):
+
         seq = nn.Sequential(self.lin1, self.leakyrelu1, self.lin2, self.leakyrelu2, self.lin3)
         if self.useEncoder:
             encoded_features = self.encoder(x).squeeze()
@@ -53,3 +56,4 @@ class CBIRModel(nn.Module):
         # print(nn.Sigmoid()(output))
         # print(F.normalize(nn.Sigmoid()(output),1).shape)
         # print(F.normalize(nn.Sigmoid()(output),1))
+

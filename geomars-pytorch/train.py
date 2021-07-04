@@ -101,7 +101,8 @@ class AddGaussianNoise(object):
 
 
 # train the model
-def train(model, dataloader, train_dict, train_dict_view2):
+
+def train(model, dataloader):
     model.train()
     running_loss = 0.0
     for bi, data in tqdm(enumerate(dataloader), total=int(len(ctx_train) / dataloader.batch_size)):
@@ -121,6 +122,7 @@ def train(model, dataloader, train_dict, train_dict_view2):
 
 
         # zero grad the optimizer
+
         # optimizer.zero_grad()
         #embeddings_orig, z_i = model(orig)
         # embeddings_view2, z_j = model(view2)
@@ -154,7 +156,9 @@ def train(model, dataloader, train_dict, train_dict_view2):
     return final_loss
 
 #validate model
-def validate(model, dataloader, val_dict, val_dict_view2, epoch):
+
+def validate(model, dataloader, epoch):
+
     model.eval()
     running_loss = 0.0
 
@@ -193,6 +197,7 @@ def validate(model, dataloader, val_dict, val_dict_view2, epoch):
                 triplet_loss += triplet_criterion(norm_embeddings_orig, interclass_labels, inter_class_triplet_indices_tuple)
 
             hashing_loss = hashing_criterion(embeddings_orig)
+
 
             #cont_loss = contrastive_loss(z_i, z_j)
             #print("Contrastive: " + str(cont_loss))
@@ -418,12 +423,14 @@ if __name__ == '__main__':
     # start training and validating
     for epoch in range(hp.EPOCHS):
         print(f"Epoch {epoch + 1} of {hp.EPOCHS}")
+
         if hp.MULTIVIEWS:
             train_epoch_loss = train(model, train_loader, train_dict_view1, train_dict_view2)
             val_epoch_loss = validate(model, val_loader, val_dict_view1, val_dict_view2, epoch)
         else:
             train_epoch_loss = train(model, train_loader, train_dict, False)
             val_epoch_loss = validate(model, val_loader, val_dict, False, epoch)
+
         # save model with best loss
         if val_epoch_loss < best_loss:
             best_epoch = epoch
