@@ -1,103 +1,24 @@
-from numpy import mod
 import torch
 import time
-from torch.nn.modules.container import ModuleList
 import torch.optim as optim
 import torch.nn as nn
 import torch.nn.functional as F
-from torch.utils.data import DataLoader, Dataset
+from torch.utils.data import DataLoader
 from tqdm import tqdm
 from torchvision import transforms, datasets
 from data import ImageFolderWithLabel, removeclassdoublings
 from CBIRModel import CBIRModel
 import hparams as hp
-from loss import criterion as hashing_criterion
+from Losses.hashing_loss import hashing_criterion as hashing_criterion
 import matplotlib.pyplot as plt
 import pickle
-from pathlib import Path
 from pytorch_metric_learning import losses, miners, distances, reducers
 import os
 from data import MultiviewDataset
-import torch.distributed as dist
 from whitening import WTransform1D, EntropyLoss
 from random import sample
-
-
-class GatherLayer(torch.autograd.Function):
-    """Gather tensors from all process, supporting backward propagation."""
-
-    @staticmethod
-    def forward(ctx, input):
-        ctx.save_for_backward(input)
-        output = [torch.zeros_like(input) for _ in range(dist.get_world_size())]
-        dist.all_gather(output, input)
-        return tuple(output)
-
-    @staticmethod
-    def backward(ctx, *grads):
-        (input,) = ctx.saved_tensors
-        grad_out = torch.zeros_like(input)
-        grad_out[:] = grads[dist.get_rank()]
-        return grad_out
-
-
-class NT_Xent(nn.Module):
-    def __init__(self, batch_size, temperature, world_size):
-        super(NT_Xent, self).__init__()
-        self.batch_size = batch_size
-        self.temperature = temperature
-        self.world_size = world_size
-
-        self.mask = self.mask_correlated_samples(batch_size, world_size)
-        self.criterion = nn.CrossEntropyLoss(reduction="sum")
-        self.similarity_f = nn.CosineSimilarity(dim=2)
-
-    def mask_correlated_samples(self, batch_size, world_size):
-        N = 2 * batch_size * world_size
-        mask = torch.ones((N, N), dtype=bool)
-        mask = mask.fill_diagonal_(0)
-        for i in range(batch_size * world_size):
-            mask[i, batch_size + i] = 0
-            mask[batch_size + i, i] = 0
-        return mask
-
-    def forward(self, z_i, z_j):
-        """
-        We do not sample negative examples explicitly.
-        Instead, given a positive pair, similar to (Chen et al., 2017), we treat the other 2(N − 1) augmented examples within a minibatch as negative examples.
-        """
-        N = 2 * self.batch_size * self.world_size
-
-        z = torch.cat((z_i, z_j), dim=0)
-        if self.world_size > 1:
-            z = torch.cat(GatherLayer.apply(z), dim=0)
-
-        sim = self.similarity_f(z.unsqueeze(1), z.unsqueeze(0)) / self.temperature
-
-        sim_i_j = torch.diag(sim, self.batch_size * self.world_size)
-        sim_j_i = torch.diag(sim, -self.batch_size * self.world_size)
-
-        # We have 2N samples, but with Distributed training every GPU gets N examples too, resulting in: 2xNxN
-        positive_samples = torch.cat((sim_i_j, sim_j_i), dim=0).reshape(N, 1)
-        negative_samples = sim[self.mask].reshape(N, -1)
-
-        labels = torch.zeros(N).to(positive_samples.device).long()
-        logits = torch.cat((positive_samples, negative_samples), dim=1)
-        loss = self.criterion(logits, labels)
-        loss /= N
-        return loss
-
-
-class AddGaussianNoise(object):
-    def __init__(self, mean=0., std=1.):
-        self.std = std
-        self.mean = mean
-
-    def __call__(self, tensor):
-        return tensor + torch.randn(tensor.size()) * self.std + self.mean
-
-    def __repr__(self):
-        return self.__class__.__name__ + '(mean={0}, std={1})'.format(self.mean, self.std)
+from Losses.nt_xent import NT_Xent
+from utils import AddGaussianNoise
 
 
 # train the model
@@ -232,6 +153,7 @@ def validate(model, dataloader,val_dict, val_dict_view2, epoch):
 
     return final_loss
 
+
 def plot_grad_flow(named_parameters):
     ave_grads = []
     layers = []
@@ -295,6 +217,7 @@ if __name__ == '__main__':
 
 
     if hp.MULTIVIEWS:
+
         multi_transform = transforms.Compose([
             transforms.RandomResizedCrop([224,224]),
             transforms.RandomHorizontalFlip(p=0.5),
@@ -303,6 +226,7 @@ if __name__ == '__main__':
             transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
             transforms.RandomApply([AddGaussianNoise(1, 0.5)], 0.5)
         ])
+
         #Use densenet on every image
         ctx_train_densenet = MultiviewDataset(root="./data/train", transform=multi_transform)
         train_loader_densenet = torch.utils.data.DataLoader(
@@ -357,78 +281,53 @@ if __name__ == '__main__':
     encoder.eval()
     encoder.to(device)
 
-
     if hp.MULTIVIEWS:
-        train_file_path = Path("./train_view1.p")
-        if train_file_path.is_file():
-            train_dict_view1 = pickle.load(open("train_view1.p","rb"))
-            train_dict_view2 = pickle.load(open("train_view2.p","rb"))
-        else:
-            train_dict_view1 = {}
-            train_dict_view2 = {}
-            for bi, data in tqdm(enumerate(train_loader_densenet), total=int(len(ctx_train_densenet) / train_loader_densenet.batch_size)):
-                #image_data,image_label = data
-                #sample_fname, _ = train_loader_densenet.dataset.samples[bi]
-                #image_data = image_data.to(device)
-                #output = encoder(image_data).squeeze().detach().clone()
-                #train_dict[sample_fname] = output
-                view1, view2 = data
-                sample_fname, _ = train_loader_densenet.dataset.samples[bi]
-                view1 = view1.to(device)
-                view2 = view2.to(device)
-                output1 = encoder(view1).squeeze().detach().clone()
-                output2 = encoder(view2).squeeze().detach().clone()
-                train_dict_view1[sample_fname] = output1
-                train_dict_view2[sample_fname] = output2
-            pickle.dump(train_dict_view1, open("train_view1.p", "wb"))
-            pickle.dump(train_dict_view2, open("train_view2.p", "wb"))
+        train_dict_view1 = {}
+        train_dict_view2 = {}
+        for bi, data in tqdm(enumerate(train_loader_densenet), total=int(len(ctx_train_densenet) / train_loader_densenet.batch_size)):
+            view1, view2 = data
+            sample_fname, _ = train_loader_densenet.dataset.samples[bi]
+            view1 = view1.to(device)
+            view2 = view2.to(device)
+            output1 = encoder(view1).squeeze().detach().clone()
+            output2 = encoder(view2).squeeze().detach().clone()
+            train_dict_view1[sample_fname] = output1
+            train_dict_view2[sample_fname] = output2
 
-        val_file_path = Path("./val_view1.p")
-        if val_file_path.is_file():
-            val_dict_view1 = pickle.load(open("val_view1.p","rb"))
-            val_dict_view2 = pickle.load(open("val_view2.p","rb"))
-        else:
-            val_dict_view1 = {}
-            val_dict_view2 = {}
-            for bi, data in tqdm(enumerate(val_loader_densenet), total=int(len(ctx_val_densenet) / val_loader_densenet.batch_size)):
-                view1, view2 = data
-                sample_fname, _ = val_loader_densenet.dataset.samples[bi]
-                view1 = view1.to(device)
-                view2 = view2.to(device)
-                output1 = encoder(view1).squeeze().detach().clone()
-                output2 = encoder(view2).squeeze().detach().clone()
-                val_dict_view1[sample_fname] = output1
-                val_dict_view2[sample_fname] = output2
+        val_dict_view1 = {}
+        val_dict_view2 = {}
+        for bi, data in tqdm(enumerate(val_loader_densenet), total=int(len(ctx_val_densenet) / val_loader_densenet.batch_size)):
+            view1, view2 = data
+            sample_fname, _ = val_loader_densenet.dataset.samples[bi]
+            view1 = view1.to(device)
+            view2 = view2.to(device)
+            output1 = encoder(view1).squeeze().detach().clone()
+            output2 = encoder(view2).squeeze().detach().clone()
+            val_dict_view1[sample_fname] = output1
+            val_dict_view2[sample_fname] = output2
             pickle.dump(val_dict_view1, open("val_view1.p", "wb"))
             pickle.dump(val_dict_view2, open("val_view2.p", "wb"))
     else:
-        train_file_path = Path("./train.p")
-        if train_file_path.is_file():
-            train_dict = pickle.load(open("train.p", "rb"))
-        else:
-            train_dict = {}
+        train_dict = {}
 
-            for bi, data in tqdm(enumerate(train_loader_densenet),
-                                 total=int(len(ctx_train_densenet) / train_loader_densenet.batch_size)):
-                image_data,image_label = data
-                sample_fname, _ = train_loader_densenet.dataset.samples[bi]
-                image_data = image_data.to(device)
-                output = encoder(image_data).squeeze().detach().clone()
-                train_dict[sample_fname] = output
-            pickle.dump(train_dict, open("train.p", "wb"))
-        val_file_path = Path("./val.p")
-        if val_file_path.is_file():
-            val_dict = pickle.load(open("val.p", "rb"))
-        else:
-            val_dict = {}
-            for bi, data in tqdm(enumerate(val_loader_densenet),
-                                 total=int(len(ctx_val_densenet) / val_loader_densenet.batch_size)):
-                image_data, image_label = data
-                sample_fname, _ = val_loader_densenet.dataset.samples[bi]
-                image_data = image_data.to(device)
-                output = encoder(image_data).squeeze().detach().clone()
-                val_dict[sample_fname] = output
-            pickle.dump(val_dict, open("val.p", "wb"))
+        for bi, data in tqdm(enumerate(train_loader_densenet),
+                             total=int(len(ctx_train_densenet) / train_loader_densenet.batch_size)):
+            image_data,image_label = data
+            sample_fname, _ = train_loader_densenet.dataset.samples[bi]
+            image_data = image_data.to(device)
+            output = encoder(image_data).squeeze().detach().clone()
+            train_dict[sample_fname] = output
+
+
+        val_dict = {}
+        for bi, data in tqdm(enumerate(val_loader_densenet),
+                             total=int(len(ctx_val_densenet) / val_loader_densenet.batch_size)):
+            image_data, image_label = data
+            sample_fname, _ = val_loader_densenet.dataset.samples[bi]
+            image_data = image_data.to(device)
+            output = encoder(image_data).squeeze().detach().clone()
+            val_dict[sample_fname] = output
+
 
 
     if hp.DOMAIN_ADAPTION:

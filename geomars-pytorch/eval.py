@@ -1,18 +1,12 @@
-from CBIRModel import CBIRModel
 import torch
-import time
-import torch.optim as optim
-import torch.nn as nn
-import torch.nn.functional as F
-from torch.utils.data import DataLoader, Dataset
+from torch.utils.data import DataLoader
 from tqdm import tqdm
-from torchvision import transforms, datasets
+from torchvision import transforms
 import os
-from PIL import Image
 from data import TripletDataset
 import hparams as hp
 from CBIRModel import CBIRModel
-from loss import criterion
+from Losses.hashing_loss import criterion
 
 if __name__ == '__main__':
 
