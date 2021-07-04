@@ -25,7 +25,7 @@ def getAP(queryPath, matchesList):
     labelList = []
     for match in matchesList:
         labelList.append(getClassFromPath(match[0]))
-    print(labelList)
+    #print(labelList)
     acc = np.zeros((0,)).astype(float)
     correct = 1
     for (i, label) in enumerate(labelList):
@@ -157,8 +157,8 @@ def query(input):
         image_data = image_data.unsqueeze(0)
 
         if hp.DOMAIN_ADAPTION:
-            print(encoder(image_data).squeeze())
-            print(target_transform(encoder(image_data).squeeze()))
+            #print(encoder(image_data).squeeze())
+            #print(target_transform(encoder(image_data).squeeze()))
             output = model(target_transform(encoder(image_data).squeeze()))
         else:
             output = model(image_data)
@@ -169,7 +169,7 @@ def query(input):
 
         feature_dict = pickle.load(open("feature_db.p", "rb"))
         query = hashCode
-        print(hashCode)
+        #print(hashCode)
         matches_list = []
         for key in feature_dict.keys():
             #print(np.array(feature_dict[key]))
