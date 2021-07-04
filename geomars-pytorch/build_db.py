@@ -29,7 +29,7 @@ def build_db():
         target_transform = WTransform1D(num_features=hp.DENSENET_NUM_FEATURES, group_size=hp.DA_GROUP_SIZE)
 
     #Load state dict
-    state_dict_path = os.path.join(os.getcwd(), "outputs/model_last.pth")
+    state_dict_path = os.path.join(os.getcwd(), "outputs/model_best.pth")
     if torch.cuda.is_available():
         model.load_state_dict(torch.load(state_dict_path))
         if hp.DOMAIN_ADAPTION:

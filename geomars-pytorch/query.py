@@ -107,7 +107,7 @@ def query(input):
         target_transform = WTransform1D(num_features=hp.DENSENET_NUM_FEATURES, group_size=hp.DA_GROUP_SIZE)
 
     #Load state dict
-    state_dict_path = os.path.join(os.getcwd(), "outputs/model_last.pth")
+    state_dict_path = os.path.join(os.getcwd(), "outputs/model_best.pth")
     if torch.cuda.is_available():
         model.load_state_dict(torch.load(state_dict_path))
         if hp.DOMAIN_ADAPTION:
@@ -147,6 +147,7 @@ def query(input):
 
     with torch.no_grad():
         image = Image.open(input)
+
         image = image.convert("RGB")
         #print(np.array(image).shape)
         image_data = data_transform(image).to(device)
@@ -163,9 +164,6 @@ def query(input):
         hashCode = np.empty(hp.HASH_BITS).astype(np.int8)
         hashCode = ((np.sign(output -0.5)+1)/2)
 
-        image.show()
-
-
         feature_dict = pickle.load(open("feature_db.p", "rb"))
         query = hashCode
         print(hashCode)
@@ -179,6 +177,16 @@ def query(input):
     matches_list.sort(key= lambda x : x[1])
     matches_list = matches_list[:64]
 
+    print("Average Precision for this query is: ", getAP(input, matches_list))
+    coordinate_distance, distance_list = getOnMarsDistance(input, matches_list)
+    print("Avg. image Location distance on the surface of Mars: ", coordinate_distance)
+    return matches_list, getAP(input, matches_list), coordinate_distance, distance_list
+
+if __name__ == '__main__':
+    input = sys.argv[1]
+    matches_list = query(input)
+
+    feature_dict = pickle.load(open("feature_db.p", "rb"))
     images = []
     for match in matches_list:
         image = Image.open(match[0])
@@ -187,15 +195,3 @@ def query(input):
 
     grid = image_grid(images, 8, 8)
     grid.show()
-
-
-    print("Average Precision for this query is: ", getAP(input, matches_list))
-    coordinate_distance, _ = getOnMarsDistance(input, matches_list)
-    print("Avg. image Location distance on the surface of Mars: ", coordinate_distance)
-    return matches_list
-
-    #print(feature_dict)
-
-if __name__ == '__main__':
-    input = sys.argv[1]
-    matches_list = query(input)
