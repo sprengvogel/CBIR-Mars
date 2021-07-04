@@ -13,16 +13,19 @@ class CBIRModel(nn.Module):
     def __init__(self, useEncoder=True):
         super(CBIRModel, self).__init__()
         self.useEncoder = useEncoder
-        if hp.USE_IMAGENET:
+        if hp.DENSENET_TYPE == "imagenet":
             self.encoder = torch.hub.load('pytorch/vision:v0.6.0', 'densenet121', pretrained=True)
             self.encoder = torch.nn.Sequential(*(list(self.encoder.children())[:-1]), nn.AvgPool2d(7))
-        else:
+        elif hp.DENSENET_TYPE == "domars16k_classifier":
             self.encoder = torch.hub.load('pytorch/vision:v0.6.0', 'densenet121', pretrained=False)
             num_ftrs = self.encoder.classifier.in_features
             self.encoder.classifier = nn.Linear(num_ftrs, 15)
             state_dict_path = os.path.join(os.getcwd(), "outputs/densenet121_pytorch_adapted.pth")
             self.encoder.load_state_dict(torch.load(state_dict_path))
             self.encoder = torch.nn.Sequential(*(list(self.encoder.children())[:-1]), nn.AvgPool2d(7))
+        else:
+            print("Specifiy correct densenet type string in hparams.py.")
+            exit(1)
         self.encoder.requires_grad_(False)
         self.encoder.eval()
         self.lin1 = nn.Linear(hp.DENSENET_NUM_FEATURES, 512)

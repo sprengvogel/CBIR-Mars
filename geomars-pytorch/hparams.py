@@ -9,6 +9,6 @@ ADAM_BETAS = (0.5,0.7) #(0.5,0.7)
 MARGIN = 0.2 #0.2
 INTERCLASSTRIPLETS = False
 KMEANS_CLUSTERS = 30
-USE_IMAGENET = True
+DENSENET_TYPE = "imagenet" # "domars16k_classifier", "domars16k_triplet"
 DOMAIN_ADAPTION = False
 DA_GROUP_SIZE = DENSENET_NUM_FEATURES // 32
