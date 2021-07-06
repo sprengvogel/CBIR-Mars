@@ -18,7 +18,6 @@ def train(model, dataloader):
         inputs = data[0].to(device)
         labels = data[1].to(device)
 
-        # zero grad the optimizer
         optimizer.zero_grad()
         embeddings = model(inputs)
         embeddings = embeddings.squeeze()
@@ -27,20 +26,13 @@ def train(model, dataloader):
         triplet_indices_tuple = triplet_mining(norm_embeddings, labels)
         triplet_loss = triplet_criterion(norm_embeddings, labels, triplet_indices_tuple)
 
-        #print("triplet loss: ", triplet_loss)
-        #print("hash loss: ", hashing_loss)
-
         loss = triplet_loss
 
         loss.backward()
-        #plot_grad_flow(model.named_parameters())
-        # update the parameters
         optimizer.step()
-        # add loss of each item (total items in a batch = batch size)
+
         running_loss += loss.item()
 
-        #if bi == int(hp.EPOCHS*0.95):
-        #    triplet_mining.type_of_triplets = "hard"
     final_loss = running_loss / (len(ctx_train) / dataloader.batch_size)
 
     return final_loss
@@ -65,7 +57,6 @@ def validate(model, dataloader, epoch):
 
             loss = triplet_loss
 
-            # add loss of each item (total items in a batch = batch size)
             running_loss += loss.item()
     final_loss = running_loss / (len(ctx_val)/ dataloader.batch_size)
 
@@ -75,7 +66,7 @@ def validate(model, dataloader, epoch):
 if __name__ == '__main__':
 
     batch_size = 16
-    epochs = 50
+    epochs = 100
 
     data_transform = transforms.Compose(
         [
