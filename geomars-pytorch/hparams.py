@@ -19,7 +19,7 @@ DENSENET_TYPE = "imagenet"
 #DENSENET_TYPE = "domars16k_triplet"
 
 # Interclass triplets parameters
-INTERCLASSTRIPLETS = True
+INTERCLASSTRIPLETS = False
 KMEANS_CLUSTERS = 30
 
 # Domain whitening parameters
