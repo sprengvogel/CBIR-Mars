@@ -97,7 +97,7 @@ def  calc_map():
     model.to(device)
 
     # Load state dict
-    state_dict_path = os.path.join(os.getcwd(), "outputs/model_last.pth")
+    state_dict_path = os.path.join(os.getcwd(), "outputs/model_best.pth")
 
     if torch.cuda.is_available():
         model.load_state_dict(torch.load(state_dict_path))
@@ -167,4 +167,3 @@ def  calc_map():
 
 if __name__ == '__main__':
     calc_map()
-
