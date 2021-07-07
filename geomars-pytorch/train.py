@@ -18,7 +18,7 @@ from data import MultiviewDataset
 from whitening import WTransform1D, EntropyLoss
 from random import sample
 from Losses.nt_xent import NT_Xent
-from utils import AddGaussianNoise
+from utils import AddGaussianNoise, load_encoder
 
 
 # train the model
@@ -235,20 +235,7 @@ if __name__ == '__main__':
             pin_memory=True,
     )
 
-    if hp.DENSENET_TYPE == "imagenet":
-        encoder = torch.hub.load('pytorch/vision:v0.6.0', 'densenet121', pretrained=True)
-        encoder = torch.nn.Sequential(*(list(encoder.children())[:-1]), nn.AvgPool2d(7))
-    elif hp.DENSENET_TYPE == "domars16k_classifier":
-        encoder = torch.hub.load('pytorch/vision:v0.6.0', 'densenet121', pretrained=False)
-        num_ftrs = encoder.classifier.in_features
-        encoder.classifier = nn.Linear(num_ftrs, 15)
-        state_dict_path = os.path.join(os.getcwd(), "outputs/densenet121_pytorch_adapted.pth")
-        encoder.load_state_dict(torch.load(state_dict_path))
-        encoder = torch.nn.Sequential(*(list(encoder.children())[:-1]), nn.AvgPool2d(7))
-    else:
-        print("Specifiy correct densenet type string in hparams.py.")
-        exit(1)
-
+    encoder = load_encoder()
     encoder.requires_grad_(False)
     encoder.eval()
     encoder.to(device)

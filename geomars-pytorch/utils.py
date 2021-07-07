@@ -1,4 +1,8 @@
 import torch
+import torch.nn as nn
+import os
+import hparams as hp
+
 
 class AddGaussianNoise(object):
     def __init__(self, mean=0., std=1.):
@@ -10,3 +14,20 @@ class AddGaussianNoise(object):
 
     def __repr__(self):
         return self.__class__.__name__ + '(mean={0}, std={1})'.format(self.mean, self.std)
+
+def load_encoder():
+    if hp.DENSENET_TYPE == "imagenet":
+        encoder = torch.hub.load('pytorch/vision:v0.6.0', 'densenet121', pretrained=True)
+        encoder = torch.nn.Sequential(*(list(encoder.children())[:-1]), nn.AvgPool2d(7))
+    elif hp.DENSENET_TYPE == "domars16k_classifier":
+        encoder = torch.hub.load('pytorch/vision:v0.6.0', 'densenet121', pretrained=False)
+        num_ftrs = encoder.classifier.in_features
+        encoder.classifier = nn.Linear(num_ftrs, 15)
+        state_dict_path = os.path.join(os.getcwd(), "outputs/densenet121_pytorch_adapted.pth")
+        encoder.load_state_dict(torch.load(state_dict_path))
+        encoder = torch.nn.Sequential(*(list(encoder.children())[:-1]), nn.AvgPool2d(7))
+    else:
+        print("Specifiy correct densenet type string in hparams.py.")
+        exit(1)
+
+    return encoder
