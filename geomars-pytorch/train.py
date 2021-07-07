@@ -183,34 +183,6 @@ if __name__ == '__main__':
     )
 
 
-    ctx_train = ImageFolderWithLabel(root="./data/train", transform=data_transform, interclasstriplets = (hp.INTERCLASSTRIPLETS and not hp.MULTIVIEWS), n_clusters = hp.KMEANS_CLUSTERS)
-    train_loader = torch.utils.data.DataLoader(
-        ctx_train,
-        batch_size=hp.BATCH_SIZE,
-        shuffle=True,
-        num_workers=4,
-        pin_memory=True,
-        drop_last=hp.MULTIVIEWS
-    )
-
-    ctx_val = ImageFolderWithLabel(root="./data/val", transform=data_transform, interclasstriplets = (hp.INTERCLASSTRIPLETS and not hp.MULTIVIEWS), n_clusters = hp.KMEANS_CLUSTERS)
-    val_loader = torch.utils.data.DataLoader(
-        ctx_val,
-        batch_size=hp.BATCH_SIZE,
-        shuffle=True,
-        num_workers=4,
-        drop_last=hp.MULTIVIEWS
-    )
-
-    ctx_test = ImageFolderWithLabel(root="./data/test", transform=data_transform)
-    test_loader = torch.utils.data.DataLoader(
-        ctx_test,
-        batch_size=hp.BATCH_SIZE,
-        shuffle=False,
-        num_workers=4,
-        drop_last=False
-    )
-
     # define device
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     print('Computation device: ', device)
@@ -281,6 +253,9 @@ if __name__ == '__main__':
     encoder.eval()
     encoder.to(device)
 
+
+    train_dict = None
+    val_dict = None
     if hp.MULTIVIEWS:
         train_dict_view1 = {}
         train_dict_view2 = {}
@@ -327,6 +302,35 @@ if __name__ == '__main__':
             image_data = image_data.to(device)
             output = encoder(image_data).squeeze().detach().clone()
             val_dict[sample_fname] = output
+
+
+    ctx_train = ImageFolderWithLabel(root="./data/train", transform=data_transform, interclasstriplets = (hp.INTERCLASSTRIPLETS and not hp.MULTIVIEWS), n_clusters = hp.KMEANS_CLUSTERS, features_dict = train_dict)
+    train_loader = torch.utils.data.DataLoader(
+        ctx_train,
+        batch_size=hp.BATCH_SIZE,
+        shuffle=True,
+        num_workers=4,
+        pin_memory=True,
+        drop_last=hp.MULTIVIEWS
+    )
+
+    ctx_val = ImageFolderWithLabel(root="./data/val", transform=data_transform, interclasstriplets = (hp.INTERCLASSTRIPLETS and not hp.MULTIVIEWS), n_clusters = hp.KMEANS_CLUSTERS, features_dict = val_dict)
+    val_loader = torch.utils.data.DataLoader(
+        ctx_val,
+        batch_size=hp.BATCH_SIZE,
+        shuffle=True,
+        num_workers=4,
+        drop_last=hp.MULTIVIEWS
+    )
+
+    ctx_test = ImageFolderWithLabel(root="./data/test", transform=data_transform)
+    test_loader = torch.utils.data.DataLoader(
+        ctx_test,
+        batch_size=hp.BATCH_SIZE,
+        shuffle=False,
+        num_workers=4,
+        drop_last=False
+    )
 
 
 

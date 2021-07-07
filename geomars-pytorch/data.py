@@ -54,7 +54,7 @@ def getRandomNumber(start, end, exclude=None):
 
 class ImageFolderWithLabel(datasets.ImageFolder):
 
-    def __init__(self, root, transform, interclasstriplets=False, n_clusters = None):
+    def __init__(self, root, transform, interclasstriplets=False, n_clusters = None, features_dict = None):
         super().__init__(root, transform)
         self.interclasstriplets = interclasstriplets
         self.n_clusters = n_clusters
@@ -73,7 +73,8 @@ class ImageFolderWithLabel(datasets.ImageFolder):
             self.standardized_data = {key: [] for key in self.class_to_idx.values()}
             for key in tqdm(self.class_to_idx.values(), total=len(self.class_to_idx)):
                 data_paths = self.samples_dict[key]
-                data = np.array([cv2.imread(path, cv2.IMREAD_GRAYSCALE).flatten() for path in data_paths])
+                #data = np.array([cv2.imread(path, cv2.IMREAD_GRAYSCALE).flatten() for path in data_paths])
+                data = np.array([features_dict[path].detach().cpu().numpy() for path in data_paths])
 
                 self.data[key] = data
                 class_mean = np.mean(data, axis=0)

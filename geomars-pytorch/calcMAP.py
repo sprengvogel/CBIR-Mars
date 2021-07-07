@@ -13,6 +13,7 @@ import pickle
 import math
 import hparams as hp
 from CBIRModel import CBIRModel
+from whitening import WTransform1D
 from scipy.spatial.distance import hamming
 
 
@@ -95,15 +96,21 @@ def  calc_map():
 
     model = CBIRModel(useProjector=False)
     model.to(device)
+    if hp.DOMAIN_ADAPTION:
+        model.useEncoder = False
+        target_transform = WTransform1D(num_features=hp.DENSENET_NUM_FEATURES, group_size=hp.DA_GROUP_SIZE)
 
     # Load state dict
     state_dict_path = os.path.join(os.getcwd(), "outputs/model_best.pth")
 
     if torch.cuda.is_available():
         model.load_state_dict(torch.load(state_dict_path))
+        if hp.DOMAIN_ADAPTION:
+            target_transform.load_state_dict(torch.load(os.path.join(os.getcwd(), 'outputs/target_transform.pth')))
     else:
         model.load_state_dict(torch.load(state_dict_path, map_location=torch.device('cpu')))
-    # torch.save(model.state_dict(), "densenet121_pytorch_adapted.pth")
+        if hp.DOMAIN_ADAPTION:
+            target_transform.load_state_dict(torch.load(os.path.join(os.getcwd(), 'outputs/target_transform.pth'), map_location=torch.device('cpu')))
 
     data_transform = transforms.Compose(
         [
@@ -122,6 +129,26 @@ def  calc_map():
         pin_memory=True,
     )
 
+    if hp.DOMAIN_ADAPTION:
+        target_transform.eval()
+        if hp.DENSENET_TYPE == "imagenet":
+            encoder = torch.hub.load('pytorch/vision:v0.6.0', 'densenet121', pretrained=True)
+            encoder = torch.nn.Sequential(*(list(encoder.children())[:-1]), nn.AvgPool2d(7))
+        elif hp.DENSENET_TYPE == "domars16k_classifier":
+            encoder = torch.hub.load('pytorch/vision:v0.6.0', 'densenet121', pretrained=False)
+            num_ftrs = encoder.classifier.in_features
+            encoder.classifier = nn.Linear(num_ftrs, 15)
+            state_dict_path = os.path.join(os.getcwd(), "outputs/densenet121_pytorch_adapted.pth")
+            encoder.load_state_dict(torch.load(state_dict_path))
+            encoder = torch.nn.Sequential(*(list(encoder.children())[:-1]), nn.AvgPool2d(7))
+        else:
+            print("Specifiy correct densenet type string in hparams.py.")
+            exit(1)
+
+        encoder.requires_grad_(False)
+        encoder.eval()
+        encoder.to(device)
+
     model.eval()
     feature_dict = pickle.load(open("feature_db.p", "rb"))
     # print(model)
@@ -132,7 +159,10 @@ def  calc_map():
             image_data, image_label = data
             image_data = image_data.to(device)
             image_label = image_label.cpu().detach().numpy()[0]
-            output = model(image_data)
+            if hp.DOMAIN_ADAPTION:
+                output = model(target_transform(encoder(image_data).squeeze()))
+            else:
+                output = model(image_data)
 
             output = output.cpu().detach().numpy()
             #hashCode = np.empty(hp.HASH_BITS).astype(np.int8)
