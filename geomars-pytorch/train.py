@@ -267,8 +267,6 @@ if __name__ == '__main__':
             output2 = encoder(view2).squeeze().detach().clone()
             val_dict_view1[sample_fname] = output1
             val_dict_view2[sample_fname] = output2
-            pickle.dump(val_dict_view1, open("val_view1.p", "wb"))
-            pickle.dump(val_dict_view2, open("val_view2.p", "wb"))
     else:
         train_dict = {}
 
