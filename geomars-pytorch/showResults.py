@@ -26,7 +26,7 @@ if __name__ == '__main__':
     "data/test/tex/B01_009863_2303_XI_50N284W_CX11292_CY34404.jpg"
     ]
 
-    with open("results/multiview_hash_128/result_multiview_128.json", "r") as f:
+    with open("results/hashing/result_hash_64.json", "r") as f:
         result_dict = json.load(f)
 
     for (i,imagepath) in enumerate(image_list):
@@ -35,9 +35,9 @@ if __name__ == '__main__':
         images = []
         resultpaths = result_dict[imagepath]["result"]
         for resultpath in resultpaths[:8]:
-            image = Image.open(resultpath[0])
-            images.append(image)
+            res_image = Image.open(resultpath[0])
+            images.append(res_image)
         grid = image_grid(images, 1, 8)
         #grid.show()
-        image.save("images/"+str(i)+"_image.jpg","JPEG")
-        grid.save("images/"+str(i)+"_query.jpg","JPEG")
+        image.save("results/images/"+str(i)+"_image.jpg","JPEG")
+        grid.save("results/images/"+str(i)+"_query.jpg","JPEG")
