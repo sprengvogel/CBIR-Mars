@@ -37,7 +37,7 @@ if __name__ == '__main__':
         for resultpath in resultpaths[:8]:
             res_image = Image.open(resultpath[0])
             images.append(res_image)
-        grid = image_grid(images, 1, 8)
+        grid = image_grid(images, 1, 5)
         #grid.show()
         image.save("results/images/"+str(i)+"_image.jpg","JPEG")
         grid.save("results/images/"+str(i)+"_query.jpg","JPEG")
