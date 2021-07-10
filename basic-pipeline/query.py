@@ -11,7 +11,27 @@ import sys
 import numpy as np
 import json
 
-SELF_TRAINED = True
+def getClassFromPath(inPath):
+    return os.path.split(inPath)[0][-3:]
+
+def getAP(queryPath, matchesList):
+    queryLabel = getClassFromPath(queryPath)
+    labelList = []
+    for match in matchesList:
+        labelList.append(getClassFromPath(match[0]))
+    #print(labelList)
+    acc = np.zeros((0,)).astype(float)
+    correct = 1
+    for (i, label) in enumerate(labelList):
+        if label == queryLabel:
+            precision = (correct / float(i+1))
+            acc = np.append(acc, [precision, ], axis=0)
+            correct += 1
+    if correct == 1:
+        return 0.
+    num = np.sum(acc)
+    den = correct - 1
+    return num/den
 
 def image_grid(imgs, rows, cols):
     assert len(imgs) == rows * cols
@@ -24,7 +44,7 @@ def image_grid(imgs, rows, cols):
         grid.paste(img, box=(i % cols * w, i // cols * h))
     return grid
 
-if __name__ == '__main__':
+def query(modelpath, imagepath):
 
     batch_size = 16
 
@@ -33,20 +53,22 @@ if __name__ == '__main__':
     print('Computation device: ', device)
 
     #Select state dict
-    if SELF_TRAINED:
-        state_dict_path = os.path.join(os.getcwd(), "outputs/model_best.pth")
-    else:
-        state_dict_path = os.path.join(os.getcwd(), "densenet121_pytorch_adapted.pth")
+    state_dict_path = os.path.join(os.getcwd(), modelpath)
 
     # initialize the model
     model = torch.hub.load('pytorch/vision:v0.6.0', 'densenet121', pretrained=False)
-    model = torch.nn.Sequential(*(list(model.children())[:-1]), nn.AvgPool2d(7))
-    model.to(device)
+
+    if modelpath == "densenet121_pytorch_adapted.pth":
+        num_ftrs = model.classifier.in_features
+        model.classifier = nn.Linear(num_ftrs, 15)
 
     if torch.cuda.is_available():
         model.load_state_dict(torch.load(state_dict_path))
     else:
         model.load_state_dict(torch.load(state_dict_path, map_location=torch.device('cpu')))
+
+    model = torch.nn.Sequential(*(list(model.children())[:-1]), nn.AvgPool2d(7))
+    model.to(device)
 
     #torch.save(model.state_dict(), "densenet121_pytorch_adapted.pth")
 
@@ -64,16 +86,13 @@ if __name__ == '__main__':
     model.eval()
     #print(model)
     with torch.no_grad():
-        image = Image.open(sys.argv[1])
+        image = Image.open(imagepath)
         image = image.convert("RGB")
-        print(np.array(image).shape)
         image_data = data_transform(image).to(device)
         image_data = image_data.unsqueeze(0)
         output = model(image_data)
         fVector = output.cpu().numpy()
         fVector = fVector.squeeze()
-        print(fVector)
-        image.show()
 
 
         db_file = open("feature_db.json", "r")
@@ -85,12 +104,25 @@ if __name__ == '__main__':
             matches_list.append((key, dist))
 
     matches_list.sort(key= lambda x : x[1])
+    matches_list = matches_list[:64]
+
+    print("Average Precision for this query is: ", getAP(imagepath, matches_list))
+    return matches_list, getAP(imagepath, matches_list)
+
+if __name__ == '__main__':
+    path = "outputs/model_best.pth"
+    matches_list,_ = query(path, sys.argv[1])
+
+
+    image = Image.open(sys.argv[1])
+    image.show()
+
+    db_file = open("feature_db.json", "r")
+    feature_dict = json.load(db_file)
     images = []
-    rows = 3
-    cols = 4
-    for match in matches_list[:rows*cols]:
+    for match in matches_list:
         image = Image.open(match[0])
         images.append(image)
-        print(match[0], " ", match[1])
-    grid = image_grid(images, rows, cols)
+
+    grid = image_grid(images, 8, 8)
     grid.show()

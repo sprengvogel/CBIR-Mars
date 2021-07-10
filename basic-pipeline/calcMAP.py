@@ -42,28 +42,32 @@ def getAP(queryLabel, labelList):
     den = correct - 1
     return num/den
 
-if __name__ == '__main__':
+def  calc_map(path):
+
 
     # define device
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     print('Computation device: ', device)
 
     #Select state dict
-    if SELF_TRAINED:
-        state_dict_path = os.path.join(os.getcwd(), "outputs/model_best.pth")
-    else:
-        state_dict_path = os.path.join(os.getcwd(), "densenet121_pytorch_adapted.pth")
+
+    state_dict_path = os.path.join(os.getcwd(), path)
 
     # initialize the model
     model = torch.hub.load('pytorch/vision:v0.6.0', 'densenet121', pretrained=False)
-    model = torch.nn.Sequential(*(list(model.children())[:-1]), nn.AvgPool2d(7))
-    model.to(device)
+
+    if path == "densenet121_pytorch_adapted.pth":
+        num_ftrs = model.classifier.in_features
+        model.classifier = nn.Linear(num_ftrs, 15)
 
     if torch.cuda.is_available():
         model.load_state_dict(torch.load(state_dict_path))
     else:
         model.load_state_dict(torch.load(state_dict_path, map_location=torch.device('cpu')))
 
+    model = torch.nn.Sequential(*(list(model.children())[:-1]), nn.AvgPool2d(7))
+    model.to(device)
+    model.eval()
 
     data_transform = transforms.Compose(
             [
@@ -83,10 +87,6 @@ if __name__ == '__main__':
     )
 
     feature_dict = {}
-
-    tf_last_layer_chopped = nn.Sequential(*list(model.children())[:-1])
-    pool = torch.nn.AvgPool2d(7)
-    model.eval()
 
     db_file = open("feature_db.json", "r")
     feature_dict = json.load(db_file)
@@ -122,3 +122,8 @@ if __name__ == '__main__':
             mAP += average_precision
     mAP /= int(len(ctx_test))
     print(mAP)
+    return mAP
+
+if __name__ == '__main__':
+    path = "outputs/model_best.pth"
+    calc_map(path)

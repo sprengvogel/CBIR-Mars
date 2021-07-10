@@ -9,28 +9,29 @@ import os
 from PIL import Image
 import json
 
-SELF_TRAINED = True
-if __name__ == '__main__':
+def build_db(path):
 
     # define device
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     print('Computation device: ', device)
 
     #Select state dict
-    if SELF_TRAINED:
-        state_dict_path = os.path.join(os.getcwd(), "outputs/model_best.pth")
-    else:
-        state_dict_path = os.path.join(os.getcwd(), "densenet121_pytorch_adapted.pth")
+    state_dict_path = os.path.join(os.getcwd(), path)
+
 
     # initialize the model
     model = torch.hub.load('pytorch/vision:v0.6.0', 'densenet121', pretrained=False)
-    model = torch.nn.Sequential(*(list(model.children())[:-1]), nn.AvgPool2d(7))
+
+    if path == "densenet121_pytorch_adapted.pth":
+        num_ftrs = model.classifier.in_features
+        model.classifier = nn.Linear(num_ftrs, 15)
 
     if torch.cuda.is_available():
         model.load_state_dict(torch.load(state_dict_path))
     else:
         model.load_state_dict(torch.load(state_dict_path, map_location=torch.device('cpu')))
 
+    model = torch.nn.Sequential(*(list(model.children())[:-1]), nn.AvgPool2d(7))
 
     data_transform = transforms.Compose(
             [
@@ -67,3 +68,7 @@ if __name__ == '__main__':
     db_file = open("feature_db.json", "w")
     db_file.write(json.dumps(feature_dict))
     db_file.close()
+
+if __name__ == '__main__':
+    path = "outputs/model_best.pth"
+    build_db(path)
