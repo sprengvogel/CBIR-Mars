@@ -26,16 +26,18 @@ if __name__ == '__main__':
     "data/test/tex/B01_009863_2303_XI_50N284W_CX11292_CY34404.jpg"
     ]
 
-    with open("results/result.json", "r") as f:
+    with open("results/hashing/result_hash_64.json", "r") as f:
         result_dict = json.load(f)
 
-    for imagepath in image_list:
+    for (i,imagepath) in enumerate(image_list):
         image = Image.open(imagepath)
-        image.show()
+        #image.show()
         images = []
         resultpaths = result_dict[imagepath]["result"]
-        for resultpath in resultpaths:
-            image = Image.open(resultpath[0])
-            images.append(image)
-        grid = image_grid(images, 8, 8)
-        grid.show()
+        for resultpath in resultpaths[:8]:
+            res_image = Image.open(resultpath[0])
+            images.append(res_image)
+        grid = image_grid(images, 1, 5)
+        #grid.show()
+        image.save("results/images/"+str(i)+"_image.jpg","JPEG")
+        grid.save("results/images/"+str(i)+"_query.jpg","JPEG")
