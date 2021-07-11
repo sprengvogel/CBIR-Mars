@@ -5,7 +5,8 @@ import json
 
 if __name__ == '__main__':
     classifier = True
-    modelpath = "outputs/model_best.pth"
+    modelpath = None
+    #modelpath = "outputs/model_best.pth"
     #modelpath = "densenet121_pytorch_adapted.pth"
     build_db.build_db(modelpath, classifier)
     mAP = calcMAP.calc_map(modelpath, classifier)

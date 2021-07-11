@@ -15,22 +15,26 @@ def build_db(path, classifier=False):
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     print('Computation device: ', device)
 
-    #Select state dict
-    state_dict_path = os.path.join(os.getcwd(), path)
+    if path != None:
+        #Select state dict
+        state_dict_path = os.path.join(os.getcwd(), path)
 
 
-    # initialize the model
-    model = torch.hub.load('pytorch/vision:v0.6.0', 'densenet121', pretrained=False)
+        # initialize the model
+        model = torch.hub.load('pytorch/vision:v0.6.0', 'densenet121', pretrained=False)
 
-    if classifier == True:
-        num_ftrs = model.classifier.in_features
-        model.classifier = nn.Linear(num_ftrs, 15)
+        if classifier == True:
+            num_ftrs = model.classifier.in_features
+            model.classifier = nn.Linear(num_ftrs, 15)
 
-    if torch.cuda.is_available():
-        model.load_state_dict(torch.load(state_dict_path))
+        if torch.cuda.is_available():
+            model.load_state_dict(torch.load(state_dict_path))
+        else:
+            model.load_state_dict(torch.load(state_dict_path, map_location=torch.device('cpu')))
     else:
-        model.load_state_dict(torch.load(state_dict_path, map_location=torch.device('cpu')))
-
+        # initialize the model
+        model = torch.hub.load('pytorch/vision:v0.6.0', 'densenet121', pretrained=True)
+         
     model = torch.nn.Sequential(*(list(model.children())[:-1]), nn.AvgPool2d(7))
 
     data_transform = transforms.Compose(

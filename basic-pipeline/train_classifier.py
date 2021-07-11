@@ -52,7 +52,7 @@ if __name__ == '__main__':
 
     batch_size = 16
     num_classes = 15
-    epochs = 2
+    epochs = 100
 
     data_transform = transforms.Compose(
         [
