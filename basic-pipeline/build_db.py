@@ -9,7 +9,7 @@ import os
 from PIL import Image
 import json
 
-def build_db(path):
+def build_db(path, classifier=False):
 
     # define device
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
@@ -22,7 +22,7 @@ def build_db(path):
     # initialize the model
     model = torch.hub.load('pytorch/vision:v0.6.0', 'densenet121', pretrained=False)
 
-    if path == "densenet121_pytorch_adapted.pth":
+    if classifier == True:
         num_ftrs = model.classifier.in_features
         model.classifier = nn.Linear(num_ftrs, 15)
 
@@ -71,4 +71,4 @@ def build_db(path):
 
 if __name__ == '__main__':
     path = "outputs/model_best.pth"
-    build_db(path)
+    build_db(path, False)

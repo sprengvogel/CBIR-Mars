@@ -42,7 +42,7 @@ def getAP(queryLabel, labelList):
     den = correct - 1
     return num/den
 
-def  calc_map(path):
+def  calc_map(path, classifier=False):
 
 
     # define device
@@ -56,7 +56,7 @@ def  calc_map(path):
     # initialize the model
     model = torch.hub.load('pytorch/vision:v0.6.0', 'densenet121', pretrained=False)
 
-    if path == "densenet121_pytorch_adapted.pth":
+    if classifier == True:
         num_ftrs = model.classifier.in_features
         model.classifier = nn.Linear(num_ftrs, 15)
 

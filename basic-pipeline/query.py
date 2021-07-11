@@ -44,7 +44,7 @@ def image_grid(imgs, rows, cols):
         grid.paste(img, box=(i % cols * w, i // cols * h))
     return grid
 
-def query(modelpath, imagepath):
+def query(modelpath, imagepath, classifier=False):
 
     batch_size = 16
 
@@ -58,7 +58,7 @@ def query(modelpath, imagepath):
     # initialize the model
     model = torch.hub.load('pytorch/vision:v0.6.0', 'densenet121', pretrained=False)
 
-    if modelpath == "densenet121_pytorch_adapted.pth":
+    if classifier == True:
         num_ftrs = model.classifier.in_features
         model.classifier = nn.Linear(num_ftrs, 15)
 

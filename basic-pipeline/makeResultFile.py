@@ -4,10 +4,11 @@ import calcMAP
 import json
 
 if __name__ == '__main__':
-    #modelpath = "outputs/model_best.pth"
-    modelpath = "densenet121_pytorch_adapted.pth"
-    build_db.build_db(modelpath)
-    mAP = calcMAP.calc_map(modelpath)
+    classifier = True
+    modelpath = "outputs/model_best.pth"
+    #modelpath = "densenet121_pytorch_adapted.pth"
+    build_db.build_db(modelpath, classifier)
+    mAP = calcMAP.calc_map(modelpath, classifier)
     image_list = ["data/test/aec/B02_010257_1657_XI_14S231W_CX3340_CY3169.jpg","data/test/aec/P13_006210_2576_XN_77N271W_CX12647_CY35659.jpg",
     "data/test/ael/B08_012727_1742_XN_05S348W_CX1593_CY12594.jpg","data/test/cli/B19_017212_1809_XN_00N033W_CX4258_CY3505.jpg",
     "data/test/cli/P03_002287_2005_XI_20N072W_CX6543_CY12329.jpg","data/test/cra/B07_012260_1447_XI_35S194W_CX4750_CY4036.jpg",
@@ -22,7 +23,7 @@ if __name__ == '__main__':
     result_dict["mAP"]=mAP
     #result_dict["average_distance"]=mars_dist_avg
     for imagepath in image_list:
-        resultpaths, query_ap = query.query(modelpath, imagepath)
+        resultpaths, query_ap = query.query(modelpath, imagepath, classifier)
         result_dict[imagepath] = {}
         result_dict[imagepath]["queryAP"] = query_ap
         #result_dict[imagepath]["query_average_distance"] = coordinate_distance
