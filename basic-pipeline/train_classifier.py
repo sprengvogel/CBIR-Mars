@@ -62,7 +62,7 @@ if __name__ == '__main__':
         ]
     )
 
-    ctx_train = datasets.ImageFolder(root="./data/train", transform=data_transform)
+    ctx_train = datasets.ImageFolder(root="../data/train", transform=data_transform)
     train_loader = torch.utils.data.DataLoader(
         ctx_train,
         batch_size=batch_size,
@@ -71,12 +71,12 @@ if __name__ == '__main__':
         pin_memory=True,
     )
 
-    ctx_val = datasets.ImageFolder(root="./data/val", transform=data_transform)
+    ctx_val = datasets.ImageFolder(root="../data/val", transform=data_transform)
     val_loader = torch.utils.data.DataLoader(
         ctx_val, batch_size=batch_size, shuffle=True, num_workers=8
     )
 
-    ctx_test = datasets.ImageFolder(root="./data/test", transform=data_transform)
+    ctx_test = datasets.ImageFolder(root="../data/test", transform=data_transform)
     test_loader = torch.utils.data.DataLoader(
         ctx_test, batch_size=batch_size, shuffle=False, num_workers=4
     )

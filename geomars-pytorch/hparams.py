@@ -24,9 +24,9 @@ KMEANS_CLUSTERS = 30
 
 # Domain whitening parameters
 DOMAIN_ADAPTION = False
-DA_GROUP_SIZE = DENSENET_NUM_FEATURES // 32
+DA_GROUP_SIZE = 32
 
 # Multiview parameters
 MULTIVIEWS= False
-PROJ_DIM = 256
+PROJ_DIM = 128
 TEMPERATURE = 0.1

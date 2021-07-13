@@ -121,7 +121,7 @@ def  calc_map():
         ]
     )
 
-    ctx_test = datasets.ImageFolder(root="./data/test", transform=data_transform)
+    ctx_test = datasets.ImageFolder(root="../data/test", transform=data_transform)
     db_loader = torch.utils.data.DataLoader(
         ctx_test,
         batch_size=1,

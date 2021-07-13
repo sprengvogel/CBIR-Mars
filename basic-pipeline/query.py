@@ -120,15 +120,15 @@ if __name__ == '__main__':
     matches_list,_ = query(path, sys.argv[1], classifier=True)
 
 
-    image = Image.open(sys.argv[1])
-    image.show()
+    #image = Image.open(sys.argv[1])
+    #image.show()
 
-    db_file = open("feature_db.json", "r")
-    feature_dict = json.load(db_file)
-    images = []
-    for match in matches_list:
-        image = Image.open(match[0])
-        images.append(image)
+    #db_file = open("feature_db.json", "r")
+    #feature_dict = json.load(db_file)
+    #images = []
+    #for match in matches_list:
+        #image = Image.open(match[0])
+        #images.append(image)
 
-    grid = image_grid(images, 8, 8)
-    grid.show()
+    #grid = image_grid(images, 8, 8)
+    #grid.show()
