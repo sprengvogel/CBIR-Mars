@@ -1,6 +1,6 @@
 
 """
-This code has been developed by Roy, Subhankar and Siarohin, Aliaksandr and Sangineto, Enver and Bulo, Samuel Rota and Sebe, Nicu and Ricci, Elisa and can be found here: https://github.com/roysubhankar/dwt-domain-adaptation.
+This code has been developed by Roy, Subhankar and Siarohin, Aliaksandr and Sangineto, Enver and Bulo, Samuel Rota and Sebe, Nicu and Ricci, Elisa or is heavily based upon their implementation and can be found here: https://github.com/roysubhankar/dwt-domain-adaptation.
 More details on the implementation are described in their paper: https://arxiv.org/abs/1903.03215
 """
 

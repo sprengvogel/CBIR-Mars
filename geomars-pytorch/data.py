@@ -92,7 +92,6 @@ class ImageFolderWithLabel(datasets.ImageFolder):
             self.imgs = np.concatenate([self.data[key] for key in self.data.keys()], axis=0)
 
             print("Performing kmeans clustering ...")
-            self.n_clusters = 30
             kmeans = KMeans(n_clusters=self.n_clusters , random_state=0).fit(self.imgs)
             self.kmeans_labels = kmeans.labels_
 
