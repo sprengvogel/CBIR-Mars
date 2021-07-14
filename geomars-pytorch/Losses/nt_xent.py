@@ -1,5 +1,7 @@
 """
-https://github.com/Spijkervet/SimCLR
+This code has been developed by Chen, Kornblith, Norouzi and Hinton or is heavily based upon their implementation and can be found here:
+https://github.com/Spijkervet/SimCLR.
+More details on the implementation are described in their paper: https://arxiv.org/pdf/2002.05709.pdf
 """
 
 import torch
