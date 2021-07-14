@@ -216,7 +216,7 @@ if __name__ == '__main__':
     encoder.eval()
     encoder.to(device)
 
-
+    #create dictionary with densenet outputs for training and validation set
     train_dict = None
     val_dict = None
     if hp.MULTIVIEWS:
@@ -303,6 +303,7 @@ if __name__ == '__main__':
             pin_memory=True,
         )
 
+        #Create targets for domain whitening transforms
         target_list = []
         for bi, data in tqdm(enumerate(target_loader_densenet),
                              total=int(len(ctx_target_densenet) / target_loader_densenet.batch_size)):

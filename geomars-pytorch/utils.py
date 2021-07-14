@@ -15,6 +15,9 @@ class AddGaussianNoise(object):
     def __repr__(self):
         return self.__class__.__name__ + '(mean={0}, std={1})'.format(self.mean, self.std)
 
+"""
+Loads the correct feature extractor depending on the hyperparameter.
+"""
 def load_encoder():
     if hp.DENSENET_TYPE == "imagenet":
         encoder = torch.hub.load('pytorch/vision:v0.6.0', 'densenet121', pretrained=True)
