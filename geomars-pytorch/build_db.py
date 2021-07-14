@@ -50,7 +50,7 @@ def build_db():
         )
 
 
-    ctx_train = datasets.ImageFolder(root="./data/database", transform=data_transform)
+    ctx_train = datasets.ImageFolder(root="../data/database", transform=data_transform)
 
     db_loader = torch.utils.data.DataLoader(
         ctx_train,

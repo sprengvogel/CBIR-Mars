@@ -183,7 +183,7 @@ if __name__ == '__main__':
         ])
 
         #Use densenet on every image
-        ctx_train_densenet = MultiviewDataset(root="./data/train", transform=multi_transform)
+        ctx_train_densenet = MultiviewDataset(root="../data/train", transform=multi_transform)
         train_loader_densenet = torch.utils.data.DataLoader(
             ctx_train_densenet,
             batch_size=1,
@@ -191,7 +191,7 @@ if __name__ == '__main__':
             num_workers=4,
             pin_memory=True,
         )
-        ctx_val_densenet = MultiviewDataset(root="./data/val", transform=multi_transform)
+        ctx_val_densenet = MultiviewDataset(root="../data/val", transform=multi_transform)
         val_loader_densenet = torch.utils.data.DataLoader(
             ctx_val_densenet,
             batch_size=1,
@@ -201,7 +201,7 @@ if __name__ == '__main__':
         )
     else:
         #Use densenet on every image
-        ctx_train_densenet = datasets.ImageFolder(root="./data/train", transform=data_transform)
+        ctx_train_densenet = datasets.ImageFolder(root="../data/train", transform=data_transform)
         train_loader_densenet = torch.utils.data.DataLoader(
             ctx_train_densenet,
             batch_size=1,
@@ -209,7 +209,7 @@ if __name__ == '__main__':
             num_workers=4,
             pin_memory=True,
         )
-        ctx_val_densenet = MultiviewDataset(root="./data/val", transform=data_transform)
+        ctx_val_densenet = MultiviewDataset(root="../data/val", transform=data_transform)
         val_loader_densenet = torch.utils.data.DataLoader(
             ctx_val_densenet,
             batch_size=1,
@@ -272,7 +272,7 @@ if __name__ == '__main__':
             val_dict[sample_fname] = output
 
 
-    ctx_train = ImageFolderWithLabel(root="./data/train", transform=data_transform, interclasstriplets = (hp.INTERCLASSTRIPLETS and not hp.MULTIVIEWS), n_clusters = hp.KMEANS_CLUSTERS, features_dict = train_dict)
+    ctx_train = ImageFolderWithLabel(root="../data/train", transform=data_transform, interclasstriplets = (hp.INTERCLASSTRIPLETS and not hp.MULTIVIEWS), n_clusters = hp.KMEANS_CLUSTERS, features_dict = train_dict)
     train_loader = torch.utils.data.DataLoader(
         ctx_train,
         batch_size=hp.BATCH_SIZE,
@@ -282,7 +282,7 @@ if __name__ == '__main__':
         drop_last=hp.MULTIVIEWS
     )
 
-    ctx_val = ImageFolderWithLabel(root="./data/val", transform=data_transform, interclasstriplets = (hp.INTERCLASSTRIPLETS and not hp.MULTIVIEWS), n_clusters = hp.KMEANS_CLUSTERS, features_dict = val_dict)
+    ctx_val = ImageFolderWithLabel(root="../data/val", transform=data_transform, interclasstriplets = (hp.INTERCLASSTRIPLETS and not hp.MULTIVIEWS), n_clusters = hp.KMEANS_CLUSTERS, features_dict = val_dict)
     val_loader = torch.utils.data.DataLoader(
         ctx_val,
         batch_size=hp.BATCH_SIZE,
@@ -291,7 +291,7 @@ if __name__ == '__main__':
         drop_last=hp.MULTIVIEWS
     )
 
-    ctx_test = ImageFolderWithLabel(root="./data/test", transform=data_transform)
+    ctx_test = ImageFolderWithLabel(root="../data/test", transform=data_transform)
     test_loader = torch.utils.data.DataLoader(
         ctx_test,
         batch_size=hp.BATCH_SIZE,
@@ -303,7 +303,7 @@ if __name__ == '__main__':
 
 
     if hp.DOMAIN_ADAPTION:
-        ctx_target_densenet = datasets.ImageFolder(root="./data/database", transform=data_transform)
+        ctx_target_densenet = datasets.ImageFolder(root="../data/database", transform=data_transform)
         target_loader_densenet = torch.utils.data.DataLoader(
             ctx_target_densenet,
             batch_size=1,

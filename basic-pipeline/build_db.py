@@ -45,7 +45,7 @@ def build_db(path, classifier=False):
             ]
         )
 
-    ctx_train = datasets.ImageFolder(root="./data/database", transform=data_transform)
+    ctx_train = datasets.ImageFolder(root="../data/database", transform=data_transform)
     db_loader = torch.utils.data.DataLoader(
         ctx_train,
         batch_size=1,
@@ -75,4 +75,4 @@ def build_db(path, classifier=False):
 
 if __name__ == '__main__':
     path = "outputs/model_best.pth"
-    build_db(path, False)
+    build_db(path, True)
