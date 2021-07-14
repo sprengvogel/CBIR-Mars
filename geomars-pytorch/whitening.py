@@ -20,7 +20,6 @@ class EntropyLoss(nn.Module):
 				q = log_softmax(x, dim=1)
 				b = p * q
 				b = -1.0 * b.sum(-1).mean()
-				#b = -1.0 * b.sum()
 				return b
 
 class _Whitening(nn.Module):
