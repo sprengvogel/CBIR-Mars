@@ -26,7 +26,6 @@ def getAP(queryPath, matchesList):
     labelList = []
     for match in matchesList:
         labelList.append(getClassFromPath(match[0]))
-    #print(labelList)
     acc = np.zeros((0,)).astype(float)
     correct = 1
     for (i, label) in enumerate(labelList):
@@ -83,11 +82,9 @@ def getOnMarsDistance(queryPath, matchesList):
     return sum(distanceList)/len(distanceList) , distanceList
 
 def image_grid(imgs, rows, cols):
-    #assert len(imgs) == rows * cols
 
     w, h = imgs[0].size
     grid = Image.new('RGB', size=(cols * w, rows * h))
-    grid_w, grid_h = grid.size
 
     for i, img in enumerate(imgs):
         grid.paste(img, box=(i % cols * w, i // cols * h))
@@ -142,13 +139,10 @@ def query(input):
         image = Image.open(input)
 
         image = image.convert("RGB")
-        #print(np.array(image).shape)
         image_data = data_transform(image).to(device)
         image_data = image_data.unsqueeze(0)
 
         if hp.DOMAIN_ADAPTION:
-            #print(encoder(image_data).squeeze())
-            #print(target_transform(encoder(image_data).squeeze()))
             output = model(target_transform(encoder(image_data).squeeze()))
         else:
             output = model(image_data)
@@ -159,13 +153,10 @@ def query(input):
 
         feature_dict = pickle.load(open("feature_db.p", "rb"))
         query = hashCode
-        #print(hashCode)
         matches_list = []
         for key in feature_dict.keys():
-            #print(np.array(feature_dict[key]))
             dist = hamming(query, np.array(feature_dict[key][0]))
             matches_list.append( (key, dist))
-            #print(dist)
 
     matches_list.sort(key= lambda x : x[1])
     matches_list = matches_list[:64]

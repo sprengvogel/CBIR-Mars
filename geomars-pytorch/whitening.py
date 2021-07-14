@@ -41,11 +41,6 @@ class _Whitening(nn.Module):
 		else:
 			self.register_buffer('running_mean', torch.zeros([1, self.num_features, 1, 1], out=torch.cuda.FloatTensor() if torch.cuda.is_available() else torch.FloatTensor()))
 			self.register_buffer('running_variance', torch.ones([self.num_groups, self.group_size, self.group_size], out=torch.cuda.FloatTensor() if torch.cuda.is_available() else torch.FloatTensor()))
-		"""
-		if self.track_running_stats:
-			self.register_buffer('running_mean', torch.zeros([1, self.num_features, 1, 1], out=torch.cuda.FloatTensor() if torch.cuda.is_available() else torch.FloatTensor()))
-			self.register_buffer('running_variance', torch.zeros([self.num_groups, self.group_size, self.group_size], out=torch.cuda.FloatTensor() if torch.cuda.is_available() else torch.FloatTensor()))
-		"""
 
 	def _check_input_dim(self, input):
 		raise NotImplementedError

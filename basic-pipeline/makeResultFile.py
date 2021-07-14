@@ -22,15 +22,11 @@ if __name__ == '__main__':
     "data/test/smo/B07_012490_1826_XI_02N358W_CX1369_CY939.jpg","data/test/tex/B01_009863_2303_XI_50N284W_CX11292_CY34404.jpg"]
     result_dict = {}
     result_dict["mAP"]=mAP
-    #result_dict["average_distance"]=mars_dist_avg
     for imagepath in image_list:
         resultpaths, query_ap = query.query(modelpath, imagepath, classifier)
         result_dict[imagepath] = {}
         result_dict[imagepath]["queryAP"] = query_ap
-        #result_dict[imagepath]["query_average_distance"] = coordinate_distance
         result_dict[imagepath]["result"] = resultpaths
-        #result_dict[imagepath]["query_distances"] = distance_list
 
-    #print(result_dict)
     with open("results/result.json", "w") as f:
         json.dump(result_dict, f, indent=4)

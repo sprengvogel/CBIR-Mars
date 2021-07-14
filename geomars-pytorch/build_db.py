@@ -77,8 +77,6 @@ def build_db():
             image_label = image_label.cpu().detach().numpy()[0]
             image_data = image_data.to(device)
             if hp.DOMAIN_ADAPTION:
-                #print(encoder(image_data).squeeze())
-                #print(target_transform(encoder(image_data).squeeze()))
                 output = model(target_transform(encoder(image_data).squeeze()))
             else:
                 output = model(image_data)
@@ -86,11 +84,8 @@ def build_db():
 
             hashCode = np.empty(hp.HASH_BITS).astype(np.int8)
             hashCode = ((np.sign(output -0.5)+1)/2)
-            #print(output)
-            #print(hashCode)
             sample_fname, _ = db_loader.dataset.samples[bi]
             feature_dict[sample_fname] = (hashCode.tolist(), image_label)
-    #print(feature_dict)
     pickle.dump(feature_dict, open("feature_db.p", "wb"))
 
 if __name__ == '__main__':

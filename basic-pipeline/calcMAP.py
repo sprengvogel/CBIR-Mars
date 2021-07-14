@@ -19,7 +19,6 @@ def image_grid(imgs, rows, cols):
 
     w, h = imgs[0].size
     grid = Image.new('RGB', size=(cols * w, rows * h))
-    grid_w, grid_h = grid.size
 
     for i, img in enumerate(imgs):
         grid.paste(img, box=(i % cols * w, i // cols * h))
@@ -94,7 +93,7 @@ def  calc_map(path, classifier=False):
 
     db_file = open("feature_db.json", "r")
     feature_dict = json.load(db_file)
-    #print(model)
+
     mAP = 0
     with torch.no_grad():
         for bi, data in tqdm(enumerate(db_loader), total=int(len(ctx_test))):
@@ -111,11 +110,8 @@ def  calc_map(path, classifier=False):
             sample_fname, _ = db_loader.dataset.samples[bi]
 
             for key in feature_dict.keys():
-                #print(feature_dict[key])
-                #print(query)
                 label = feature_dict[key][1]
                 dist = np.linalg.norm(query - np.array(feature_dict[key][0]))
-                #if dist < best_match[1]:
                 matches_list.append( (key, dist))
                 label_list.append(label)
             #Sort matches by distance and sort labels in the same way

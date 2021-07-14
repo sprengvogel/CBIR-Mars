@@ -23,7 +23,6 @@ def image_grid(imgs, rows, cols):
 
     w, h = imgs[0].size
     grid = Image.new('RGB', size=(cols * w, rows * h))
-    grid_w, grid_h = grid.size
 
     for i, img in enumerate(imgs):
         grid.paste(img, box=(i % cols * w, i // cols * h))
@@ -140,7 +139,7 @@ def  calc_map():
 
     model.eval()
     feature_dict = pickle.load(open("feature_db.p", "rb"))
-    # print(model)
+
     mAP = 0
     marsDistanceAvg = 0
     with torch.no_grad():
@@ -154,7 +153,6 @@ def  calc_map():
                 output = model(image_data)
 
             output = output.cpu().detach().numpy()
-            #hashCode = np.empty(hp.HASH_BITS).astype(np.int8)
 
             hashCode = ((np.sign(output -0.5)+1)/2)
 
@@ -180,8 +178,6 @@ def  calc_map():
     mAP /= int(len(ctx_test))
     marsDistanceAvg /= int(len(ctx_test))
     print(mAP)
-
-    print(marsDistanceAvg)
     return mAP, marsDistanceAvg
 
 if __name__ == '__main__':

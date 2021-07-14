@@ -38,7 +38,6 @@ def image_grid(imgs, rows, cols):
 
     w, h = imgs[0].size
     grid = Image.new('RGB', size=(cols * w, rows * h))
-    grid_w, grid_h = grid.size
 
     for i, img in enumerate(imgs):
         grid.paste(img, box=(i % cols * w, i // cols * h))
@@ -75,8 +74,6 @@ def query(modelpath, imagepath, classifier=False):
     model = torch.nn.Sequential(*(list(model.children())[:-1]), nn.AvgPool2d(7))
     model.to(device)
 
-    #torch.save(model.state_dict(), "densenet121_pytorch_adapted.pth")
-
     data_transform = transforms.Compose(
             [
                 transforms.Resize([224, 224]),
@@ -86,8 +83,6 @@ def query(modelpath, imagepath, classifier=False):
         )
 
 
-
-    tf_last_layer_chopped = nn.Sequential(*list(model.children())[:-1])
     model.eval()
     #print(model)
     with torch.no_grad():
@@ -98,7 +93,6 @@ def query(modelpath, imagepath, classifier=False):
         output = model(image_data)
         fVector = output.cpu().numpy()
         fVector = fVector.squeeze()
-
 
         db_file = open("feature_db.json", "r")
         feature_dict = json.load(db_file)
@@ -116,19 +110,18 @@ def query(modelpath, imagepath, classifier=False):
 
 if __name__ == '__main__':
     path = "outputs/model_best.pth"
-    #path = None
     matches_list,_ = query(path, sys.argv[1], classifier=True)
 
 
-    #image = Image.open(sys.argv[1])
-    #image.show()
+    image = Image.open(sys.argv[1])
+    image.show()
 
-    #db_file = open("feature_db.json", "r")
-    #feature_dict = json.load(db_file)
-    #images = []
-    #for match in matches_list:
-        #image = Image.open(match[0])
-        #images.append(image)
+    db_file = open("feature_db.json", "r")
+    feature_dict = json.load(db_file)
+    images = []
+    for match in matches_list:
+        image = Image.open(match[0])
+        images.append(image)
 
-    #grid = image_grid(images, 8, 8)
-    #grid.show()
+    grid = image_grid(images, 8, 8)
+    grid.show()

@@ -35,6 +35,7 @@ def train(model, dataloader, train_dict, train_dict_view2):
                 orig = source_whitening(orig)
                 view2 = source_whitening(view2)
 
+            # zero grad the optimizer
             optimizer.zero_grad()
             embeddings_orig, z_i = model(orig)
             embeddings_view2, z_j = model(view2)
@@ -43,16 +44,14 @@ def train(model, dataloader, train_dict, train_dict_view2):
             orig = torch.stack([train_dict[x] for x in data[0]])
             if hp.DOMAIN_ADAPTION:
                 orig = source_whitening(orig)
+            
+            # zero grad the optimizer
             optimizer.zero_grad()
             embeddings_orig = model(orig)
         labels = data[1]
 
 
-        # zero grad the optimizer
-
-        # optimizer.zero_grad()
-        #embeddings_orig, z_i = model(orig)
-        # embeddings_view2, z_j = model(view2)
+        
         norm_embeddings_orig = F.normalize(embeddings_orig, p=2, dim=1)
 
         if hp.MULTIVIEWS:
@@ -109,7 +108,6 @@ def validate(model, dataloader,val_dict, val_dict_view2, epoch):
                 if hp.DOMAIN_ADAPTION:
                     orig = target_whitening(orig)
                     view2 = target_whitening(view2)
-                #optimizer.zero_grad()
                 embeddings_orig, z_i = model(orig)
                 embeddings_view2, z_j = model(view2)
                 cont_loss = cont_criterion(z_i, z_j)
@@ -117,16 +115,11 @@ def validate(model, dataloader,val_dict, val_dict_view2, epoch):
                 orig = torch.stack([val_dict[x] for x in data[0]])
                 if hp.DOMAIN_ADAPTION:
                     orig = target_whitening(orig)
-                #optimizer.zero_grad()
                 embeddings_orig = model(orig)
+
             labels = data[1]
-            #embeddings_orig, z_i = model(orig)
-            #embeddings_view2, z_j = model(view2)
-            #print("labels: ", labels)
-            #print(embeddings)
             norm_embeddings_orig = F.normalize(embeddings_orig, p=2, dim=1)
-            #norm_embeddings_view2 = F.normalize(embeddings_view2, p=2, dim=1)
-            #print(norm_embeddings)
+
             if hp.MULTIVIEWS:
                 triplet_loss = 0
             else:
@@ -300,8 +293,6 @@ if __name__ == '__main__':
         drop_last=False
     )
 
-
-
     if hp.DOMAIN_ADAPTION:
         ctx_target_densenet = datasets.ImageFolder(root="../data/database", transform=data_transform)
         target_loader_densenet = torch.utils.data.DataLoader(
@@ -330,15 +321,12 @@ if __name__ == '__main__':
     # initialize the model
     model = CBIRModel(useEncoder=False, useProjector=hp.MULTIVIEWS)
     model.to(device)
-    #print(nn.Sequential(*list(model.children())[:-1]))
 
     # define optimizer. Also initialize learning rate scheduler
     optimizer = optim.Adam(model.parameters(), lr=hp.LR, betas=hp.ADAM_BETAS)
-    #optimizer = optim.SGD(model.parameters(), lr=LR, momentum=0.9)
-    #optimizer = LARS(model.parameters(), lr=0.3 * BATCH_SIZE / 256, weight_decay=0.000006)
 
-    distance = distances.LpDistance()#distances.CosineSimilarity()#
-    reducer = reducers.ThresholdReducer(low = 0)#DoNothingReducer()#
+    distance = distances.LpDistance()
+    reducer = reducers.ThresholdReducer(low = 0)
     triplet_criterion = losses.TripletMarginLoss(margin = hp.MARGIN, distance = distance, reducer = reducer)
 
     triplet_mining = miners.TripletMarginMiner(margin=hp.MARGIN, distance=distance, type_of_triplets="semihard")
@@ -365,7 +353,6 @@ if __name__ == '__main__':
             best_epoch = epoch
             best_loss = val_epoch_loss
             print("Saved Model. Best Epoch: " + str(best_epoch+1))
-            #torch.save(nn.Sequential(*list(model.children())[:-1]).state_dict(), 'outputs/model_best.pth')
             torch.save(model.state_dict(), 'outputs/model_best.pth')
         print("Saved last Model.")
         torch.save(model.state_dict(), 'outputs/model_last.pth')
